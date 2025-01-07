@@ -106,6 +106,15 @@ function print_sequences(jst::JournaledString)
     end
 end
 
+# Function to build the n sequences
+function build_sequences(jst::JournaledString)
+    builded = ""
+    for i in 1:length(jst.deltaMap)
+        modified_seq = apply_delta(jst.reference, jst.deltaMap[i])
+        builded *= "Sequence $i: " * string(modified_seq) * "\n"
+    end
+    return builded
+end
 # Function to print all of the deltas
 function print_deltas(jst::JournaledString)
     for j in 1:length(jst.deltaMap)
@@ -118,5 +127,8 @@ end
 
 
 export JournalEntry, JournaledString, add_delta!, apply_delta, print_sequences,
-        print_deltas
+        build_sequences, print_deltas, DeltaType, DeltaTypeDel, DeltaTypeIns, 
+        DeltaTypeSnp, DeltaTypeSV, SortedDict, LongDNA, DNA, copy, delete_at!,
+        insert!
+ 
 end
