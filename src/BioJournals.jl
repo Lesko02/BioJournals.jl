@@ -117,4 +117,6 @@ function print_deltas(jst::JournaledString)
 end
 
 
+export JournalEntry, JournaledString, add_delta!, apply_delta, print_sequences,
+        print_deltas
 end
