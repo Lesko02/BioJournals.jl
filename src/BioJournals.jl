@@ -172,6 +172,7 @@ end
 export JournalEntry, JournaledString, add_delta!, apply_delta, print_sequences,
         build_sequences, print_deltas, DeltaType, DeltaTypeDel, DeltaTypeIns, 
         DeltaTypeSnp, DeltaTypeSV, SortedDict, LongDNA, DNA, copy, delete_at!,
-        insert!
+        insert!, get_mutation_history, get_mutation_interval,
+        get_sequences_at_time, simulate_mutation, compare_sequences
  
 end
