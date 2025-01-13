@@ -106,7 +106,7 @@ function print_sequences(jst::JournaledString)
     end
 end
 
-# Function to build the n sequences
+# Function to build the n sequences into a sigle string
 function build_sequences(jst::JournaledString)
     builded = ""
     for i in 1:length(jst.deltaMap)
@@ -125,6 +125,49 @@ function print_deltas(jst::JournaledString)
     end
 end
 
+#API definitions
+
+function get_mutation_history(delta_map::SortedDict{Int, JournalEntry})
+    mutation_history = ""
+    for (time, entry) in delta_map
+        mutation_history *= "Time $time: $entry\n"
+    end
+    return mutation_history
+end
+
+function get_mutation_interval(delta_map::SortedDict{Int, JournalEntry},
+                                 time1::Int, time2::Int)
+    mutation_interval = ""
+    for (time, entry) in delta_map
+        if time1 <= time <= time2
+            mutation_interval *= "Time $time: $entry\n"
+        end
+    end
+    return mutation_interval
+end
+
+function get_sequences_at_time(jst::JournaledString, time::Int)
+    sequences_at_time = Vector{LongDNA{4}}(undef, length(jst.deltaMap))
+    for i in 1:length(jst.deltaMap)
+        filtered_delta = SortedDict{Int, JournalEntry}()
+        for (entry_time, entry) in jst.deltaMap[i]
+            if entry_time > time
+                break
+            end
+            filtered_delta[entry_time] = entry
+        end
+        sequences_at_time[i] = apply_delta(jst.reference, filtered_delta)
+    end
+    return sequences_at_time
+end
+
+function simulate_mutation(jst::JournaledString, entry::JournalEntry)
+    
+end
+
+function compare_sequences(jst1::JournaledString, jst2::JournaledString)
+
+end
 
 export JournalEntry, JournaledString, add_delta!, apply_delta, print_sequences,
         build_sequences, print_deltas, DeltaType, DeltaTypeDel, DeltaTypeIns, 
