@@ -83,6 +83,17 @@ function add_delta!(deltaMap, indices::Vector{Int},
     end
 end
 
+function add_delta!(deltaMap, indices::Vector{Int}, 
+    entry::JournalEntry)
+        for idx in indices
+        # Insert the entry into the SortedDict with `time` as the key
+        deltaMap[idx][current_time[]] = entry
+
+        # Increment the current time
+        current_time[] += 1
+        end
+end
+
 function apply_delta(reference::LongDNA{4}, 
                     delta::SortedDict{Int, JournalEntry})
     seq = copy(reference)
@@ -170,11 +181,7 @@ end
 
 function simulate_mutation!(jst::JournaledString, index::Int,
                              entry::JournalEntry)
-    if index > length(jst.deltaMap)
-        error("Index out of bounds")
-    end
-    delta = jst.deltaMap[index]
-    delta[entry.time] = entry 
+   add_delta!(jst.deltaMap, index, entry)
 end
 
 export JournalEntry, JournaledString, add_delta!, apply_delta, print_sequences,
