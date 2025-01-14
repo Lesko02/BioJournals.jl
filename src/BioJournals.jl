@@ -47,6 +47,7 @@ function structure_variation!(seq::LongDNA{4}, pos::Int, subseq::LongDNA)
         return seq
     end
 end
+
 # Implementation of SCV
 function single_copy_variation(seq::LongDNA{4}, pos::Int, subseq::LongDNA, rep)
     for i in (0, rep)
@@ -54,6 +55,7 @@ function single_copy_variation(seq::LongDNA{4}, pos::Int, subseq::LongDNA, rep)
     end    
 return seq
 end
+
 # Journal Entry
 struct JournalEntry
     delta_type::DeltaType    # Type of delta
@@ -129,7 +131,6 @@ function apply_delta(reference::LongDNA{4},
     return seq
 end
 
-
 # Function to print the n sequences
 function print_sequences(jst::JournaledString)
     for i in 1:length(jst.deltaMap)
@@ -147,6 +148,7 @@ function build_sequences(jst::JournaledString)
     end
     return builded
 end
+
 # Function to print all of the deltas
 function print_deltas(jst::JournaledString)
     for j in 1:length(jst.deltaMap)
