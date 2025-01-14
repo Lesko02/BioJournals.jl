@@ -47,6 +47,13 @@ function structure_variation!(seq::LongDNA{4}, pos::Int, subseq::LongDNA)
         return seq
     end
 end
+# Implementation of SCV
+function single_copy_variation(seq::LongDNA{4}, pos::Int, subseq::LongDNA, rep)
+    for i in (0, int)
+    insert!(seq,pos,subseq) 
+    end    
+return seq
+end
 # Journal Entry
 struct JournalEntry
     delta_type::DeltaType    # Type of delta
