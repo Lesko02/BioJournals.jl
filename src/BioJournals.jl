@@ -49,7 +49,7 @@ function structure_variation!(seq::LongDNA{4}, pos::Int, subseq::LongDNA)
 end
 # Implementation of SCV
 function single_copy_variation(seq::LongDNA{4}, pos::Int, subseq::LongDNA, rep)
-    for i in (0, int)
+    for i in (0, rep)
     insert!(seq,pos,subseq) 
     end    
 return seq
