@@ -85,8 +85,8 @@ function add_delta!(deltaMap, indices::Vector{Int},
     end
 end
 
-function add_delta!(deltaMap, indices::Vector{Int}, 
-    entry::JournalEntry)
+function add_delta!(deltaMap::Vector{SortedDict{Int, JournalEntry}},
+     indices::Vector{Int}, entry::JournalEntry)
         for idx in indices
         # Insert the entry into the SortedDict with `time` as the key
         deltaMap[idx][current_time[]] = entry
