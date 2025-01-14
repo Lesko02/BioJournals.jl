@@ -161,18 +161,18 @@ function get_sequences_at_time(jst::JournaledString, time::Int)
     return sequences_at_time
 end
 
-function simulate_mutation(jst::JournaledString, entry::JournalEntry)
-    
-end
-
-function compare_sequences(jst1::JournaledString, jst2::JournaledString)
-
+function simulate_mutation!(jst::JournaledString, index::Int,
+                             entry::JournalEntry)
+    if index > length(jst.deltaMap)
+        error("Index out of bounds")
+    end
+    delta = jst.deltaMap[index]
+    delta[entry.time] = entry 
 end
 
 export JournalEntry, JournaledString, add_delta!, apply_delta, print_sequences,
         build_sequences, print_deltas, DeltaType, DeltaTypeDel, DeltaTypeIns, 
         DeltaTypeSnp, DeltaTypeSV, SortedDict, LongDNA, DNA, copy, delete_at!,
-        insert!, get_mutation_history, get_mutation_interval,
-        get_sequences_at_time, simulate_mutation, compare_sequences
+        insert!
  
 end
