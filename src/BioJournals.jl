@@ -128,7 +128,7 @@ function apply_delta(reference::LongDNA{4},
         elseif entry.delta_type == DeltaTypeSV
             seq = structure_variation!(seq, entry.position, entry.data)
         elseif entry.delta_type == DeltaTypeCNV
-            seq = copy_number_variation!(seq, entry.position,entry.data)
+            seq = copy_number_variation!(seq, entry.position, entry.data)
         end
     end
     return seq
