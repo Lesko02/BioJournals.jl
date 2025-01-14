@@ -5,7 +5,7 @@ using DataStructures
 using FASTX
 
 # Definition of DeltaTypes
-@enum DeltaType DeltaTypeDel DeltaTypeIns DeltaTypeSnp DeltaTypeSV
+@enum DeltaType DeltaTypeDel DeltaTypeIns DeltaTypeSnp DeltaTypeSV DeltaTypeCNV
 
 # Definition of current_time
 current_time = Ref(0)
@@ -49,7 +49,8 @@ function structure_variation!(seq::LongDNA{4}, pos::Int, subseq::LongDNA)
 end
 
 # Implementation of SCV
-function single_copy_variation(seq::LongDNA{4}, pos::Int, subseq::LongDNA, rep)
+function copy_number_variation!(seq::LongDNA{4}, pos::Int,
+     (subseq::LongDNA, rep::int))
     for i in (0, rep)
     insert!(seq,pos,subseq) 
     end    
@@ -126,6 +127,8 @@ function apply_delta(reference::LongDNA{4},
             # Larger Structure change
         elseif entry.delta_type == DeltaTypeSV
             seq = structure_variation!(seq, entry.position, entry.data)
+        elseif entry.delta_type == DeltaTypeCNV
+            seq = copy_number_variation!(seq, entry.position,entry.data)
         end
     end
     return seq
