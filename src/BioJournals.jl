@@ -94,6 +94,20 @@ function add_delta!(deltaMap, indices::Vector{Int},
         end
 end
 
+function remove_delta!(deltaMap::Vector{SortedDict{Int, JournalEntry}},
+    time::Int)
+    for idx in deltaMap
+        for entry in deltaMap[idx]
+            if(entry[time] == time)
+                delete!(deltaMap[idx], time)
+            else
+            error("No mutation found at time: $time" )
+            end
+        end
+    end
+    
+end
+
 function apply_delta(reference::LongDNA{4}, 
                     delta::SortedDict{Int, JournalEntry})
     seq = copy(reference)
@@ -182,6 +196,10 @@ end
 function simulate_mutation!(jst::JournaledString, index::Int,
                              entry::JournalEntry)
    add_delta!(jst.deltaMap, index, entry)
+end
+
+function remove_mutation!(jst::JournaledString, time::Int)
+    remove_delta!(jst.deltaMap, time)
 end
 
 export JournalEntry, JournaledString, add_delta!, apply_delta, print_sequences,
