@@ -48,7 +48,7 @@ function structure_variation!(seq::LongDNA{4}, pos::Int, subseq::LongDNA)
     end
 end
 
-# Implementation of SCV
+# Implementation of CNV
 function copy_number_variation!(seq::LongDNA{4}, pos::Int,
      (subseq::LongDNA, rep::int))
     for i in (0, rep)
