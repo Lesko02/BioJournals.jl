@@ -47,11 +47,12 @@ end
 
 # Implementation of CNV
 function copy_number_variation!(seq::LongDNA{4}, pos::Int,
-     (subseq::LongDNA, rep::int))
-    for i in (0, rep)
-    insert!(seq,pos,subseq) 
-    end    
-return seq
+    params::Tuple{LongDNA{4}, Int})
+   subseq, rep = params  # Deconstruct the tuple
+   for i in 1:rep  # Insert subseq `rep` times
+       insert!(seq, pos, subseq)
+   end    
+   return seq
 end
 
 # Journal Entry
