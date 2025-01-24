@@ -7,9 +7,6 @@ using FASTX
 # Definition of DeltaTypes
 @enum DeltaType DeltaTypeDel DeltaTypeIns DeltaTypeSnp DeltaTypeSV DeltaTypeCNV
 
-# Definition of current_time
-current_time = Ref(0)
-
 # Custom insert for sequences
 function insert!(seq::LongDNA{4}, pos::Int, subseq::LongDNA)
     for symbol in subseq
@@ -66,43 +63,49 @@ struct JournalEntry
 end                          
 
 # Definition of JournaledString Structure
-struct JournaledString
-    reference::LongDNA{4}                            
-    deltaMap::Vector{SortedDict{Int, JournalEntry}}  # Sorted by time
-end                                        
+mutable struct JournaledString
+    reference::LongDNA{4}
+    deltaMap::Vector{SortedDict{Int, JournalEntry, Base.Order.ForwardOrdering}}
+    current_time::Int
+end
+
+# Constructor for JournaledString
+function JournaledString(reference::LongDNA{4},
+    deltaMap::Vector{SortedDict{Int, JournalEntry, Base.Order.ForwardOrdering}})
+    JournaledString(reference, deltaMap, 0)  # Default value for current_time
+end
 
 # Function to add a new Delta
-function add_delta!(deltaMap, indices::Vector{Int}, 
+function add_delta!(js::JournaledString, indices::Vector{Int}, 
                     delta_type::DeltaType, position::Int, data::Any)
     for idx in indices
        # Create the new JournalEntry
-       new_entry = JournalEntry(delta_type, position, data, current_time[])
+       new_entry = JournalEntry(delta_type, position, data, js.current_time)
         
        # Insert the entry into the SortedDict with `time` as the key
-       deltaMap[idx][current_time[]] = new_entry
+       js.deltaMap[idx][js.current_time] = new_entry
 
        # Increment the current time
-       current_time[] += 1
+       js.current_time += 1
     end
 end
 
-function add_delta!(deltaMap::Vector{SortedDict{Int, JournalEntry}},
+function add_delta!(js::JournaledString,
      indices::Vector{Int}, entry::JournalEntry)
         for idx in indices
         # Insert the entry into the SortedDict with `time` as the key
-        deltaMap[idx][current_time[]] = entry
+        js.deltaMap[idx][js.current_time] = entry
 
         # Increment the current time
-        current_time[] += 1
+        js.current_time += 1
         end
 end
 
-function remove_delta!(deltaMap::Vector{SortedDict{Int, JournalEntry}},
-    time::Int)
+function remove_delta!(js::JournaledString, time::Int)
     for idx in deltaMap
-        for entry in deltaMap[idx]
+        for entry in js.deltaMap[idx]
             if(entry[time] == time)
-                delete!(deltaMap[idx], time)
+                delete!(js.deltaMap[idx], time)
             else
             error("No mutation found at time: $time" )
             end
@@ -207,9 +210,52 @@ function remove_mutation!(jst::JournaledString, time::Int)
     remove_delta!(jst.deltaMap, time)
 end
 
-export JournalEntry, JournaledString, add_delta!, apply_delta, print_sequences,
-        build_sequences, print_deltas, DeltaType, DeltaTypeDel, DeltaTypeIns, 
-        DeltaTypeSnp, DeltaTypeSV, SortedDict, LongDNA, DNA, copy, delete_at!,
-        insert!
- 
+function is_equal(entry1::JournalEntry, entry2::JournalEntry)::Bool
+    return entry1.delta_type == entry2.delta_type &&
+           entry1.position == entry2.position &&
+           entry1.data == entry2.data
+end
+
+function is_equal(jst1::JournaledString, jst2::JournaledString)::Bool
+
+    l1 = length(jst1.deltaMap)
+    l2 = length(jst2.deltaMap)
+
+    if js1.reference != js2.reference
+       return false
+    end
+    
+    if l1 != l2
+        return false
+    end
+
+    # Compare each SortedDict in deltaMap
+    for (i, dict1) in enumerate(js1.deltaMap)
+        dict2 = js2.deltaMap[i]
+
+        # Compare sizes of the SortedDicts
+        if length(dict1) != length(dict2)
+            return false
+        end
+
+        # Compare JournalEntry values, ignoring time
+        entries1 = collect(values(dict1))
+        entries2 = collect(values(dict2))
+
+        # Ensure the two sets of entries match
+        if length(entries1) != length(entries2) ||
+           !all(is_equal(entries1[j], entries2[j]) for j in 1:length(entries1))
+            return false
+        end
+    end
+
+    return true
+
+end
+
+export insert!, delete_at!, structure_variation!, copy_number_variation!,
+ JournalEntry, JournaledString, add_delta!, remove_delta!, apply_delta,
+ print_sequences, build_sequences, print_deltas, get_mutation_history,
+ get_mutation_interval, get_sequences_at_time, simulate_mutation!,
+ remove_mutation!, is_equal
 end
