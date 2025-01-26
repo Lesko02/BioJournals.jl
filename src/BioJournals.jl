@@ -211,47 +211,14 @@ function remove_mutation!(jst::JournaledString, time::Int)
     remove_delta!(jst.deltaMap, time)
 end
 
-function is_equal(entry1::JournalEntry, entry2::JournalEntry)::Bool
-    return entry1.delta_type == entry2.delta_type &&
-           entry1.position == entry2.position &&
-           entry1.data == entry2.data
-end
-
 function is_equal(jst1::JournaledString, jst2::JournaledString)::Bool
-
-    l1 = length(jst1.deltaMap)
-    l2 = length(jst2.deltaMap)
-
-    if js1.reference != js2.reference
-       return false
-    end
-    
-    if l1 != l2
+    if hash(jst1.reference) != hash(jst2.reference)
         return false
     end
-
-    # Compare each SortedDict in deltaMap
-    for (i, dict1) in enumerate(js1.deltaMap)
-        dict2 = js2.deltaMap[i]
-
-        # Compare sizes of the SortedDicts
-        if length(dict1) != length(dict2)
-            return false
-        end
-
-        # Compare JournalEntry values, ignoring time
-        entries1 = collect(values(dict1))
-        entries2 = collect(values(dict2))
-
-        # Ensure the two sets of entries match
-        if length(entries1) != length(entries2) ||
-           !all(is_equal(entries1[j], entries2[j]) for j in 1:length(entries1))
-            return false
-        end
+    if jst1.current_time != jst2.current_time
+        return false
     end
-
-    return true
-
+return hash(jst1.deltaMap)==hash(jst2.deltaMap)
 end
 
 export insert!, delete_at!, structure_variation!, copy_number_variation!,
