@@ -109,7 +109,7 @@ function add_node(tree::JSTree, parent_name::String,
 tree.children[node_name] = new_node
 end
 
-function flatten(tree::JSTree, node_name::String)::String
+function flatten(tree::JSTree, node_name::String)
     # Base case: Root sequence
     if node_name == "root"
         return tree.root
@@ -117,7 +117,7 @@ function flatten(tree::JSTree, node_name::String)::String
 
     # Recursive case: Flatten parent and apply deltas
     node = tree.children[node_name]
-    parent_sequence = flatten(tree, node.parent)
+    parent_sequence = flatten(tree, node.parent.name)
     return apply_delta(parent_sequence, node.deltaMap)
 end
 
@@ -136,7 +136,10 @@ end
 function print_sequences(tree::JSTree)
     println("root: ", tree.root)
     for (name, node) in tree.children
-        println("$name: ", flatten(tree, node.name))
+        if name != "root"
+        println("$name: ")
+        println(flatten(tree, node.name))
+        end
     end
 end
 
