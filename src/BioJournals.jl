@@ -76,6 +76,70 @@ function JournaledString(reference::LongDNA{4},
     JournaledString(reference, deltaMap, 0)  # Default value for current_time
 end
 
+struct JSTNode
+    parent::Union{Nothing, JSTNode}
+    deltaMap::Union{Nothing, SortedDict{Int, JournalEntry, Base.Order.ForwardOrdering}}
+    name::String
+end
+
+struct JSTree
+    root::LongDNA{4};
+    children::Dict{String, JSTNode}
+ end
+
+ function JSTree(root_sequence::LongDNA{4})
+    # Create the root node with "Nothing" as the parent and an empty deltaMap
+    root_node = JSTNode(nothing, nothing, "root")
+    return JSTree(root_sequence, Dict("root" => root_node))
+end
+
+function add_node(tree::JSTree, parent_name::String, 
+    deltas::SortedDict{Int, JournalEntry, Base.Order.ForwardOrdering}, 
+    node_name::String)
+
+    if !haskey(tree.children, parent_name)
+        error("Parent node '$parent_name' does not exist.")
+    else
+        # If parent is not root, ensure the parent exists in the tree
+        parent_node = tree.children[parent_name]
+        new_node = JSTNode(parent_node, deltas, node_name)
+    end
+
+# Add the new node to the tree
+tree.children[node_name] = new_node
+end
+
+function flatten(tree::JSTree, node_name::String)::String
+    # Base case: Root sequence
+    if node_name == "root"
+        return tree.root
+    end
+
+    # Recursive case: Flatten parent and apply deltas
+    node = tree.children[node_name]
+    parent_sequence = flatten(tree, node.parent)
+    return apply_delta(parent_sequence, node.deltaMap)
+end
+
+function print_tree(tree::JSTree, node_name::String = "root", indent::Int = 0)
+    println(" "^(indent * 2) * "|- " * node_name)  # Correct string concatenation
+    
+    # Recursively print children
+    for (child_name, child_node) in tree.children
+        # Only print children whose parent matches the current node's name
+        if child_node.parent !== nothing && child_node.parent.name == node_name
+            print_tree(tree, child_name, indent + 1)  # Recursively print children
+        end
+    end
+end
+
+function print_sequences(tree::JSTree)
+    println("root: ", tree.root)
+    for (name, node) in tree.children
+        println("$name: ", flatten(tree, node.name))
+    end
+end
+
 # Function to add a new Delta
 function add_delta!(js::JournaledString, indices::Vector{Int}, 
                     delta_type::DeltaType, position::Int, data::Any)
