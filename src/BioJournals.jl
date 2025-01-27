@@ -15,7 +15,11 @@ function insert!(seq::LongDNA{4}, pos::Int, subseq::LongDNA)
     return seq
 end
 
-# Custom delete_at for ranges
+"""
+delete_at!
+
+Custom delete_at! for ranges
+"""
 function delete_at!(seq::LongDNA, pos_range::UnitRange{Int})
     for i in reverse(pos_range)
         Base.deleteat!(seq, i)
