@@ -7,7 +7,7 @@
 Simulators tracking mutations in a cell population, e.g., to study the
 evolution of a solid tumor, must manipulate many DNA/RNA sequences at
 a time.  It is obviously unfeasible to duplicate a full sequence every
-time a mutation happens.  Any such simulator must therefore deal rely
+time a mutation happens.  Any such simulator must therefore rely
 on sophisticated data structures just tracking the *delta*'s from one
 sequence to the next, while keeping them in a *tree-like* (or more
 complex) data structure.
