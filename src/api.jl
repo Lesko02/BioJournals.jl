@@ -1,6 +1,6 @@
 #API definitions
 
-function get_mutation_history(delta_map::SortedDict{Int, JournalEntry})
+function get_mutation_history(delta_map::DeltaMap)
     mutation_history = ""
     for (time, entry) in delta_map
         mutation_history *= "Time $time: $entry\n"
@@ -8,8 +8,7 @@ function get_mutation_history(delta_map::SortedDict{Int, JournalEntry})
     return mutation_history
 end
 
-function get_mutation_interval(delta_map::SortedDict{Int, JournalEntry},
-                                 time1::Int, time2::Int)
+function get_mutation_interval(delta_map::DeltaMap, time1::Int, time2::Int)
     mutation_interval = ""
     for (time, entry) in delta_map
         if time1 <= time <= time2
@@ -22,7 +21,7 @@ end
 function get_sequences_at_time(jst::JournaledString, time::Int)
     sequences_at_time = Vector{LongDNA{4}}(undef, length(jst.deltaMap))
     for i in 1:length(jst.deltaMap)
-        filtered_delta = SortedDict{Int, JournalEntry}()
+        filtered_delta = DeltaMap()
         for (entry_time, entry) in jst.deltaMap[i]
             if entry_time > time
                 break
@@ -35,7 +34,7 @@ function get_sequences_at_time(jst::JournaledString, time::Int)
 end
 
 function simulate_mutation!(jst::JournaledString, index::Int,
-                             entry::JournalEntry)
+     entry::JournalEntry)
    add_delta!(jst.deltaMap, index, entry)
 end
 
