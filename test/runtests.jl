@@ -1,7 +1,5 @@
 ### -*- Mode: Julia -*-
 
-### runtests.jl ends here.
-
 using BioJournals
 using Test
 using BioSequences
@@ -12,9 +10,9 @@ using DataStructures
     reference_seq = LongDNA{4}("AGATCGAGCGAGCTAGCGACTCAG")
     deltaMap = [SortedDict{Int, JournalEntry}() for _ in 1:10]
     jst = JournaledString(reference_seq, deltaMap)
-    add_delta!(jst.deltaMap, [1, 2], DeltaTypeIns, 8, "CGTA")
-    add_delta!(jst.deltaMap, [4, 9], DeltaTypeSnp, 10, 'C')
-    add_delta!(jst.deltaMap, [8], DeltaTypeIns, 24, "NNNNN")
+    add_delta!(jst, [1, 2], DeltaTypeIns, 8, "CGTA")
+    add_delta!(jst, [4, 9], DeltaTypeSnp, 10, 'C')
+    add_delta!(jst, [8], DeltaTypeIns, 24, "NNNNN")
     
     @test build_sequences(jst) ==
         "Sequence 1: AGATCGAATGCGCGAGCTAGCGACTCAG\n" *
