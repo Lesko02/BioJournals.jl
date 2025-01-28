@@ -118,62 +118,62 @@ end
 
 # Function to add a new Delta
 function add_delta!(js::JournaledString, indices::Vector{Int}, 
-    delta_type::DeltaType, position::Int, data::Any)
+        delta_type::DeltaType, position::Int, data::Any)
+    for idx in indices
+        # Create the new JournalEntry
+        new_entry = JournalEntry(delta_type, position, data, js.current_time)
+
+        # Insert the entry into the SortedDict with `time` as the key
+        js.deltaMap[idx][js.current_time] = new_entry
+
+        # Increment the current time
+        js.current_time += 1
+    end
+end
+
+function add_delta!(js::JournaledString, indices::Vector{Int}, 
+    entry::JournalEntry)
 for idx in indices
-# Create the new JournalEntry
-new_entry = JournalEntry(delta_type, position, data, js.current_time)
+    # Insert the entry into the SortedDict with `time` as the key
+    js.deltaMap[idx][js.current_time] = entry
 
-# Insert the entry into the SortedDict with `time` as the key
-js.deltaMap[idx][js.current_time] = new_entry
-
-# Increment the current time
-js.current_time += 1
-end
-end
-
-function add_delta!(js::JournaledString,
-indices::Vector{Int}, entry::JournalEntry)
-for idx in indices
-# Insert the entry into the SortedDict with `time` as the key
-js.deltaMap[idx][js.current_time] = entry
-
-# Increment the current time
-js.current_time += 1
-end
+    # Increment the current time
+    js.current_time += 1
+    end
 end
 
 function remove_delta!(js::JournaledString, time::Int)
-for idx in deltaMap
-for entry in js.deltaMap[idx]
-if(entry[time] == time)
-delete!(js.deltaMap[idx], time)
-else
-error("No mutation found at time: $time" )
-end
-end
-end
-
+    for idx in deltaMap
+        for entry in js.deltaMap[idx]
+            if entry[time] == time
+                delete!(js.deltaMap[idx], time)
+            else
+                error("No mutation found at time: $time" )
+        end
+    end
 end
 
-function apply_delta(reference::LongDNA{4}, 
-    delta::SortedDict{Int, JournalEntry})
-seq = copy(reference)
-for (_, entry) in delta  # Access entries in sorted order of `time`
-# Check on the DeltaType
-if entry.delta_type == DeltaTypeDel
-seq = delete_at!(seq, entry.position:(entry.position + 
-   entry.data - 1))  # Data is the bound of the range
-elseif entry.delta_type == DeltaTypeIns
-seq = insert!(seq, entry.position, LongDNA{4}(entry.data))
-# Single nucleotide permutation
-elseif entry.delta_type == DeltaTypeSnp
-seq[entry.position] = convert(DNA, entry.data)  
-# Larger Structure change
-elseif entry.delta_type == DeltaTypeSV
-seq = structure_variation!(seq, entry.position, entry.data)
-elseif entry.delta_type == DeltaTypeCNV
-seq = copy_number_variation!(seq, entry.position, entry.data)
 end
-end
-return seq
+
+function apply_delta(reference::LongDNA{4}, delta::DeltaMap)
+
+    seq = copy(reference)
+    for (_, entry) in delta  # Access entries in sorted order of `time`
+        # Check on the DeltaType
+        if entry.delta_type == DeltaTypeDel
+            seq = delete_at!(seq, entry.position:(entry.position + 
+            entry.data - 1))  # Data is the bound of the range
+        elseif entry.delta_type == DeltaTypeIns
+            seq = insert!(seq, entry.position, LongDNA{4}(entry.data))
+        # Single nucleotide permutation
+        elseif entry.delta_type == DeltaTypeSnp
+            seq[entry.position] = convert(DNA, entry.data)  
+            # Larger Structure change
+        elseif entry.delta_type == DeltaTypeSV
+            seq = structure_variation!(seq, entry.position, entry.data)
+        elseif entry.delta_type == DeltaTypeCNV
+            seq = copy_number_variation!(seq, entry.position, entry.data)
+        end
+    end
+    return seq
 end
