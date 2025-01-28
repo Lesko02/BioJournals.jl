@@ -1,6 +1,8 @@
 # Definition of DeltaTypes
 @enum DeltaType DeltaTypeDel DeltaTypeIns DeltaTypeSnp DeltaTypeSV DeltaTypeCNV
 
+const DeltaMap = SortedDict{Int, JournalEntry, Base.Order.ForwardOrdering}
+
 # Journal Entry
 struct JournalEntry
     delta_type::DeltaType    # Type of delta
@@ -12,20 +14,19 @@ end
 # Definition of JournaledString Structure
 mutable struct JournaledString
     reference::LongDNA{4}
-    deltaMap::Vector{SortedDict{Int, JournalEntry, Base.Order.ForwardOrdering}}
+    deltaMap::Vector{DeltaMap}
     current_time::Int
 end
 
 # Constructor for JournaledString
-function JournaledString(reference::LongDNA{4},
-    deltaMap::Vector{SortedDict{Int, JournalEntry, Base.Order.ForwardOrdering}})
+function JournaledString(reference::LongDNA{4}, deltaMap::Vector{DeltaMap})
     JournaledString(reference, deltaMap, 0)  # Default value for current_time
 end
 
 #JST
 struct JSTNode
     parent::Union{Nothing, JSTNode}
-    deltaMap::Union{Nothing, SortedDict{Int, JournalEntry, Base.Order.ForwardOrdering}}
+    deltaMap::Union{Nothing, DeltaMap}
     name::String
 end
 
@@ -40,9 +41,8 @@ struct JSTree
     return JSTree(root_sequence, Dict("root" => root_node))
 end
 
-function add_node(tree::JSTree, parent_name::String, 
-    deltas::SortedDict{Int, JournalEntry, Base.Order.ForwardOrdering}, 
-    node_name::String)
+function add_node(tree::JSTree, parent_name::String, deltas::DeltaMap,
+     node_name::String)
 
     if !haskey(tree.children, parent_name)
         error("Parent node '$parent_name' does not exist.")
