@@ -1,8 +1,6 @@
 # Definition of DeltaTypes
 @enum DeltaType DeltaTypeDel DeltaTypeIns DeltaTypeSnp DeltaTypeSV DeltaTypeCNV
 
-const DeltaMap = SortedDict{Int, JournalEntry, Base.Order.ForwardOrdering}
-
 # Journal Entry
 struct JournalEntry
     delta_type::DeltaType    # Type of delta
@@ -10,6 +8,8 @@ struct JournalEntry
     data::Any                # Additional Data
     time::Int                # Timestamp
 end
+
+const DeltaMap = SortedDict{Int, JournalEntry, Base.Order.ForwardOrdering}
 
 # Definition of JournaledString Structure
 mutable struct JournaledString
