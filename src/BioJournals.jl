@@ -4,9 +4,10 @@ using BioSequences
 using DataStructures
 using FASTX
 
-include("structs.jl")
-include("functions.jl")
+include("algorithms.jl")
 include("api.jl")
+include("functions.jl")
+include("structs.jl")
 
 export DeltaType, DeltaTypeDel, DeltaTypeIns, DeltaTypeSnp, DeltaTypeSV,
  DeltaTypeCNV, insert!, delete_at!, structure_variation!,
