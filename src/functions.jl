@@ -155,10 +155,30 @@ end
 
 end
 
+function apply_delta(reference::LongDNA{4}, entry::JournalEntry)
+    seq = copy(reference)
+        # Check on the DeltaType
+        if entry.delta_type == DeltaTypeDel
+            seq = delete_at!(seq, entry.position:(entry.position + 
+            entry.data - 1))  # Data is the bound of the range
+        elseif entry.delta_type == DeltaTypeIns
+            seq = insert!(seq, entry.position, LongDNA{4}(entry.data))
+        # Single nucleotide permutation
+        elseif entry.delta_type == DeltaTypeSnp
+            seq[entry.position] = convert(DNA, entry.data)  
+            # Larger Structure change
+        elseif entry.delta_type == DeltaTypeSV
+            seq = structure_variation!(seq, entry.position, entry.data)
+        elseif entry.delta_type == DeltaTypeCNV
+            seq = copy_number_variation!(seq, entry.position, entry.data)
+        end
+    return seq
+end
+
 function apply_delta(reference::LongDNA{4}, delta::DeltaMap)
 
     seq = copy(reference)
-    for (_, entry) in delta  # Access entries in sorted order of `time`
+    for (_, entry) in delta 
         # Check on the DeltaType
         if entry.delta_type == DeltaTypeDel
             seq = delete_at!(seq, entry.position:(entry.position + 
