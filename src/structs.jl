@@ -51,7 +51,6 @@ function add_node(tree::JSTree, parent_name::String, deltas::DeltaMap,
         parent_node = tree.children[parent_name]
         new_node = JSTNode(parent_node, deltas, node_name)
     end
-
 # Add the new node to the tree
 tree.children[node_name] = new_node
 end
