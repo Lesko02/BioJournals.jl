@@ -2,7 +2,7 @@ function horspool_find(jss::JournaledString, needle::LongDNA{4})
     # Yet to be coded
 end
 
-function horspool_findfind(jst::JSTree, needle::LongDNA{4})
+function horspool_find(jst::JSTree, needle::LongDNA{4})
     # Yet to be coded
 end
 
@@ -14,10 +14,44 @@ function myers_ukkoken_find(jst::JSTree, needle::LongDNA{4})
     # Yet to be coded
 end
 
-function naive_search(jss::JournaledString, needle::LongDNA )
+
+function approximate_search(jss::JournaledString, needle::LongDNA{4})
+    query = ApproximateSearchQuery(needle)
+    tolerance = Int64((length(needle)/100)*5)
+    indices = UnitRange{Int64}[]
+    vector = UnitRange{Int64}
+    indices = findall(query, tolerance, jss.reference)
+
+    for range in indices
+        for i in length(jss.deltaMap)
+            for entry in jss.deltaMap[i]
+                empty!(vector)
+                if entry.position in range
+                    seq = apply_delta(jss.reference, entry)
+                    vector = push!(findall(query, tolerance, seq))
+                    pop!(range, indices)
+                    if isempty(vector)
+                        println("No match at Deltamap N° $i")
+                    else
+                        println("Match at Deltamap N° $i")
+                        print("Ranges: ", vector)
+                    end
+                end
+            end 
+            println("Match at Deltamap N° $i")
+            println("Ranges: ", indices)
+        end
+    end
+end
+
+function approximate_search(jst::JSTree, needle::LongDNA{4})
+
+end
+
+function slow_search(jss::JournaledString, needle::LongDNA )
 
     query = ExactSearchQuery(needle)
-    vector = UnitRange{Int}[]
+    vector = UnitRange{Int64}[]
     for i in 1:length(jss.deltaMap)
         empty!(vector)
         seq = apply_delta(jss.reference, jss.deltaMap[i])
@@ -34,6 +68,24 @@ function naive_search(jss::JournaledString, needle::LongDNA )
 
 end
 
-function naive_find(jst::JSTree, needle::LongDNA{4})
-    # Yet to be coded
+function slow_search(jst::JSTree, needle::LongDNA{4})
+    query = ExactSearchQuery(needle)
+    vector = UnitRange{Int64}[]
+
+    for (name, child) in jst.children
+
+        empty!(vector)
+
+        if (!isnothing(child.deltaMap))
+            seq = apply_delta(flatten(jst, name), child.deltaMap)
+            vector = BioSequences.findall(query, seq)
+        end
+        
+        if isempty(vector)
+            println("No match at child: $name")
+        else
+            println("Match at child: $name")
+            println("Ranges: ", vector)
+        end
+    end
 end
