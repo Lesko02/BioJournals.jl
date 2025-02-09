@@ -51,3 +51,14 @@ function is_equal(jst1::JournaledString, jst2::JournaledString)::Bool
     end
 return hash(jst1.deltaMap)==hash(jst2.deltaMap)
 end
+
+function print_results(results::Dict{Int64, Vector{UnitRange{Int64}}})
+    for i in 1:length(results)
+        if isempty(results[i])
+            println("No Match in DeltaMap $i")
+        else
+            println("Match in $i:")
+            println("Ranges: ", results[i])
+        end
+    end
+end
