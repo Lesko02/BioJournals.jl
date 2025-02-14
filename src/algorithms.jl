@@ -67,23 +67,17 @@ function approximate_search(jst::JSTree, needle::LongDNA{4})
 end
 
 function slow_search(jss::JournaledString, needle::LongDNA )
-
+    results = Dict(i => UnitRange{Int64}[] for i in 1:length(jss.deltaMap))
     query = ExactSearchQuery(needle)
     vector = UnitRange{Int64}[]
     for i in 1:length(jss.deltaMap)
-        empty!(vector)
+
         seq = apply_delta(jss.reference, jss.deltaMap[i])
         vector = BioSequences.findall(query, seq)
-
-        if isempty(vector)
-            println("No match at Deltamap N° $i")
-        else
-            println("Match at Deltamap N° $i")
-            println("Ranges: ", vector)
-        end
+        append!(results[i], vector)
 
     end
-
+    return results
 end
 
 function slow_search(jst::JSTree, needle::LongDNA{4})
