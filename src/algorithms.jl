@@ -62,11 +62,54 @@ function approximate_search(jss::JournaledString, needle::LongDNA{4})
     return indexMatrix
 end
 
+function approximate_search(jss::JournaledString, needle::LongDNA{4},
+        tol::Int64)
+
+    if tol == 0 || tol >= 100
+        error("Tolerance cannot be 0% or more than 100%")
+    end
+
+    tolerance = ceil(Int64, (length(needle) / 100) * tol) 
+    query = ApproximateSearchQuery(needle)
+    indexMatrix = Dict{Int64, Vector{UnitRange{Int64}}}()
+    vector = approximate_findall(query, tolerance, jss.reference)
+    to_remove = Set{UnitRange{Int64}}()
+    to_add = Set{UnitRange{Int64}}()
+
+    for i in 1:length(jss.deltaMap)
+        indexMatrix[i] = vector
+    end
+
+    for i in 1:length(jss.deltaMap)
+        empty!(to_add)
+        empty!(to_remove)
+        for range in indexMatrix[i]
+            for ( _, entry) in jss.deltaMap[i]
+                
+                if entry.position in range
+                    seq = apply_delta(jss.reference, entry)
+
+                    for element in approximate_findall(query, tolerance, seq)
+                        push!(to_add, element)
+                    end
+                    
+                    push!(to_remove, range)
+                end
+
+            end
+        end 
+        indexMatrix[i]= filter(x -> all(y -> x != y, to_remove), indexMatrix[i])
+        append!(indexMatrix[i], to_add)
+        indexMatrix[i] = collect(Set(indexMatrix[i]))
+    end
+    return indexMatrix
+end
+
 function approximate_search(jst::JSTree, needle::LongDNA{4})
     # Yet to be coded
 end
 
-function slow_search(jss::JournaledString, needle::LongDNA )
+function exact_search(jss::JournaledString, needle::LongDNA )
     results = Dict(i => UnitRange{Int64}[] for i in 1:length(jss.deltaMap))
     query = ExactSearchQuery(needle)
     vector = UnitRange{Int64}[]
@@ -80,9 +123,14 @@ function slow_search(jss::JournaledString, needle::LongDNA )
     return results
 end
 
-function slow_search(jst::JSTree, needle::LongDNA{4})
+function exact_search(jst::JSTree, needle::LongDNA{4})
+    indexMatrix = Dict{String, Vector{UnitRange{Int64}}}()
     query = ExactSearchQuery(needle)
     vector = UnitRange{Int}[]
+
+    indexMatrix = Dict{String, Vector{UnitRange{Int64}}}(
+        name => UnitRange{Int64}[] for name in keys(jst.children))
+    
     for (name, child) in jst.children
 
         empty!(vector)
@@ -90,12 +138,10 @@ function slow_search(jst::JSTree, needle::LongDNA{4})
         seq = flatten(jst, name)
         vector = BioSequences.findall(query, seq)
         end
+
+        indexMatrix[name] = append!(indexMatrix[name], vector)
         
-        if isempty(vector)
-            println("No match at child: $name")
-        else
-            println("Match at child: $name")
-            println("Ranges: ", vector)
-        end
     end
+    return indexMatrix
 end
+
