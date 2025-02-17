@@ -62,3 +62,14 @@ function print_results(results::Dict{Int64, Vector{UnitRange{Int64}}})
         end
     end
 end
+
+function print_results(results::Dict{String, Vector{UnitRange{Int64}}})
+    for (name, _) in results
+        if isempty(results[name])
+            println("No Match at $name")
+        else
+            println("Match at $name:")
+            println("Ranges: ", results[name])
+        end
+    end
+end
