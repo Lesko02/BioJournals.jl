@@ -63,10 +63,10 @@ function approximate_search(jss::JournaledString, needle::LongDNA{4})
 end
 
 function approximate_search(jss::JournaledString, needle::LongDNA{4},
-        tol::Int64)
+    tol::Int64)
 
-    if tol == 0 || tol >= 100
-        error("Tolerance cannot be 0% or more than 100%")
+    if tol <= 0 || tol >= 100
+        error("Tolerance cannot less or 0% or more than 100%")
     end
 
     tolerance = ceil(Int64, (length(needle) / 100) * tol) 
@@ -84,19 +84,21 @@ function approximate_search(jss::JournaledString, needle::LongDNA{4},
         empty!(to_add)
         empty!(to_remove)
         for range in indexMatrix[i]
+            
             for ( _, entry) in jss.deltaMap[i]
-                
+                    
                 if entry.position in range
                     seq = apply_delta(jss.reference, entry)
 
                     for element in approximate_findall(query, tolerance, seq)
                         push!(to_add, element)
                     end
-                    
+                        
                     push!(to_remove, range)
                 end
 
             end
+
         end 
         indexMatrix[i]= filter(x -> all(y -> x != y, to_remove), indexMatrix[i])
         append!(indexMatrix[i], to_add)
@@ -106,7 +108,62 @@ function approximate_search(jss::JournaledString, needle::LongDNA{4},
 end
 
 function approximate_search(jst::JSTree, needle::LongDNA{4})
-    # Yet to be coded
+
+    seq = jst.root
+    query = ApproximateSearchQuery(needle)
+    vector = UnitRange{Int}[]
+    indexMatrix = Dict{String, Vector{UnitRange{Int64}}}(
+        name => UnitRange{Int64}[] for name in keys(jst.children))
+    tolerance = ceil(Int64, (length(needle) / 100) * 5) 
+
+    vector = approximate_findall(query, tolerance, seq)
+    to_remove = Set{UnitRange{Int64}}()
+    to_add = Set{UnitRange{Int64}}()
+    range2 = Set{UnitRange{Int64}}()
+
+    for (name, _) in indexMatrix
+        indexMatrix[name] = vector
+    end
+
+    println(vector)
+
+    for (name, node) in jst.children
+
+        for range in indexMatrix[name]
+
+            empty!(to_add)
+            empty!(to_remove)
+            if !isnothing(node.deltaMap)
+                empty!(range2)
+                seq = flatten(jst, node.parent.name)
+                range2 = push!(range2, range)
+                range2 = union!(range2, approximate_findall(query, 
+                tolerance, seq))
+                union!(to_add, range2)
+                for (time, entry) in node.deltaMap
+                    for range3 in range2
+                        if entry.position in range3
+                            
+                            seq = apply_delta(seq, entry)
+                                
+                            for element in approximate_findall(query,
+                                tolerance, seq)
+                                push!(to_add, element)
+                            end
+                            push!(to_remove, range3)   
+                        end
+                    end
+                    
+                end
+            append!(indexMatrix[name], to_add)
+            indexMatrix[name]= filter(x -> all(y -> x != y, to_remove), 
+            indexMatrix[name])
+                
+        end
+        indexMatrix[name] = collect(Set(indexMatrix[name]))
+        end
+    end
+    return indexMatrix
 end
 
 function exact_search(jss::JournaledString, needle::LongDNA )
