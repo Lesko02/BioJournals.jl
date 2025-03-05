@@ -2,18 +2,20 @@
 Insert a subsequence into a DNA sequence.
 Uses the BioJournals insert.
 
-Args: 
-    seq: A LongDNA{4} sequence to modify. 
-    pos: Position where the subsequence is inserted. 
-    subseq: A LongDNA sequence to insert.
+# Args: 
+   - `seq`: A LongDNA{4} sequence to modify. 
+   - `pos`: Position where the subsequence is inserted. 
+   - `subseq`: A LongDNA sequence to insert.
 
-Returns: Updated LongDNA{4} sequence.
+# Returns: 
+   - Updated LongDNA{4} sequence.
 
-Examples: 
+# Examples: 
+```julia-repl
     julia> insert!(LongDNA{4}("ACGT"), 2, LongDNA("CG")) 
     LongDNA{4}("ACCGT") 
+```
 """
-
 function insert!(seq::LongDNA{4}, pos::Int, subseq::LongDNA)
     for symbol in subseq
         BioSequences.insert!(seq, pos, symbol)
@@ -24,16 +26,18 @@ end
 """
 Delete a range of symbols from a DNA sequence.
 
-Args: 
-    seq: A LongDNA sequence to modify. 
-    pos_range: Range of positions to delete.
+# Args: 
+   - `seq`: A LongDNA sequence to modify. 
+   - `pos_range`: Range of positions to delete.
 
-Returns: 
-    Updated LongDNA sequence.
+# Returns: 
+   - Updated LongDNA sequence.
 
-Examples: 
+# Examples: 
+```julia-repl
     julia> delete_at!(LongDNA("ACGTACGT"), 3:5) 
     LongDNA("ACACGT") 
+```
 """
 function delete_at!(seq::LongDNA, pos_range::UnitRange{Int})
     for i in reverse(pos_range)
@@ -45,20 +49,20 @@ end
 """
 Apply a structure variation to a DNA sequence.
 
-Args: 
-    seq: A LongDNA{4} sequence to modify. 
-    pos: Position where the variation occurs. 
-    subseq: LongDNA sequence for variation.
+# Args: 
+   - `seq`: A LongDNA{4} sequence to modify. 
+   - `pos`: Position where the variation occurs. 
+   - `subseq`: LongDNA sequence for variation.
 
-Returns: 
-    Updated LongDNA{4} sequence.
+# Returns: 
+   - Updated LongDNA{4} sequence.
 
-Examples: 
+# Examples: 
+```julia-repl
     julia> structure_variation!(LongDNA{4}("ACGT"), 4, LongDNA("TT")) 
     LongDNA{4}("ACGTTT") 
+```
 """
-
-# Naive implementation of structure_variation //TO FIX//
 function structure_variation!(seq::LongDNA{4}, pos::Int, subseq::LongDNA)
     # Check if it's a base case of an append!
     if pos == lastindex(seq)
@@ -83,19 +87,20 @@ end
 """
 Apply a copy number variation (CNV).
 
-Args: 
-    seq: A LongDNA{4} sequence to modify. 
-    pos: Position for the variation. 
-    params: Tuple (subseq, repetitions).
+# Args: 
+   - `seq`: A LongDNA{4} sequence to modify. 
+   - `pos`: Position for the variation. 
+   - `params`: Tuple (subseq, repetitions).
 
-Returns: 
-    Updated LongDNA{4} sequence.
+# Returns: 
+   - Updated LongDNA{4} sequence.
 
-Examples: 
+# Examples: 
+```julia-repl
     julia> copy_number_variation!(LongDNA{4}("ACGT"), 2, (LongDNA{4}("GG"), 3)) 
     LongDNA{4}("ACGGGGGGT") 
+```    
 """
-# Implementation of CNV
 function copy_number_variation!(seq::LongDNA{4}, pos::Int,
     params::Tuple{LongDNA{4}, Int})
    subseq, rep = params  # Deconstruct the tuple
@@ -107,20 +112,21 @@ end
 
 #end of deltas
 """
-Flatten a JSTree to obtain a sequence.
+Flattens a JSTree to obtain a sequence.
 
-Args: 
-    tree: JSTree structure. 
-    node_name: Node to flatten.
+# Args: 
+   - `tree`: JSTree structure. 
+   - `node_name`: Node to flatten.
 
-Returns: 
-    Flattened sequence.
+# Returns: 
+   - Flattened sequence.
 
-Examples: 
+# Examples: 
+```julia-repl
     julia> flatten(tree, "child_node") 
     LongDNA{4}("ACGT") 
+```
 """
-
 function flatten(tree::JSTree, node_name::String)
     # Base case: Root sequence
     if node_name == "root"
@@ -134,21 +140,23 @@ function flatten(tree::JSTree, node_name::String)
 end
 
 """
-Print a visual tree representation.
+Prints a visual tree representation.
 
-Args: 
-    tree: JSTree structure. 
-    node_name: Node to start from. 
-    indent: Indentation level.
+# Args: 
+   - `tree`: JSTree structure. 
+   - `node_name`: Node to start from. 
+   - `indent`: Indentation level.
 
-Returns: 
-    None (prints tree).
+# Returns: 
+   - None (prints tree).
 
-Examples: 
+# Examples: 
+```julai-repl
     julia> print_tree(tree) 
     |- root
        |- child1
        |- child2 
+```
 """
 function print_tree(tree::JSTree, node_name::String = "root", indent::Int = 0)
     println(" "^(indent * 2) * "|- " * node_name) 
@@ -162,18 +170,20 @@ function print_tree(tree::JSTree, node_name::String = "root", indent::Int = 0)
 end
 
 """
-Print all JSTree sequences.
+Prints all JSTree sequences.
 
-Args: 
-    tree: JSTree structure.
+# Args: 
+   - `tree`: JSTree structure.
 
-Returns: 
-    None (prints sequences).
+# Returns: 
+   - None (prints sequences).
 
-Examples: 
+# Examples: 
+```julia-repl
     julia> print_sequences(tree) 
     root: ACGT... 
     child1: ACG... 
+```
 """
 function print_sequences(tree::JSTree)
     println("root: ", tree.root)
@@ -186,19 +196,20 @@ function print_sequences(tree::JSTree)
 end
 
 """
-Print sequences from a JournaledString.
+Prints sequences from a JournaledString.
 
-Args: 
-    jst: JournaledString structure.
+# Args: 
+   - `jst`: JournaledString structure.
 
-Returns: 
-    None (prints sequences).
+# Returns: 
+   - None (prints sequences).
 
-Examples: 
+# Examples: 
+```julia-repl
     julia> print_sequences(jst) 
     Sequence 1: ACGT... 
+```
 """
-
 function print_sequences(jst::JournaledString)
     for i in 1:length(jst.deltaMap)
         modified_seq = apply_delta(jst.reference, jst.deltaMap[i])
@@ -207,19 +218,21 @@ function print_sequences(jst::JournaledString)
 end
 
 """
-Build a string with all sequences.
+Builds a string with all sequences.
 
-Args: 
-    js: JournaledString structure.
+# Args: 
+   - `js`: JournaledString structure.
 
-Returns: 
-    Concatenated sequences.
+# Returns: 
+   - Concatenated sequences.
 
-Examples: 
+# Examples: 
+```julia-repl
     julia> build_sequences(js) 
     "Sequence 1: ACGT...
     Sequence 2: TGCA...
-    " 
+    ..." 
+```    
 """
 function build_sequences(js::JournaledString)
     builded = ""
@@ -231,18 +244,20 @@ function build_sequences(js::JournaledString)
 end
 
 """
-Print all deltas in a JournaledString.
+Prints all deltas in a JournaledString.
 
-Args: 
-    js: JournaledString structure.
+# Args: 
+   - `js`: JournaledString structure.
 
-Returns: 
-    None (prints deltas).
+# Returns: 
+   - None (prints deltas).
 
-Examples: 
+# Examples: 
+```julia-repl
     julia> print_deltas(js) 
-    String number 1: 
-      [time=1] JournalEntry: ... 
+    " String number 1: 
+      [time=1] JournalEntry: ... "
+```
 """
 function print_deltas(js::JournaledString)
     for j in 1:length(js.deltaMap)
@@ -254,20 +269,22 @@ function print_deltas(js::JournaledString)
 end
 
 """
-Add a delta to a JournaledString.
+Adds a delta to a JournaledString.
 
-Args: 
-    js: JournaledString structure. 
-    indices: Indices to update. 
-    delta_type: Type of delta. 
-    position: Position for delta. 
-    data: Data for the delta.
+# Args: 
+   - `js`: JournaledString structure. 
+   - `indices`: Indices to update. 
+   - `delta_type`: Type of delta. 
+   - `position`: Position for delta. 
+   - `data`: Data for the delta.
 
-Returns: 
-    None (modifies JournaledString).
+# Returns: 
+   - None (modifies JournaledString).
 
-Examples: 
+# Examples: 
+```julia-repl
     julia> add_delta!(js, [1, 2], DeltaTypeIns, 3, "AC") 
+```    
 """
 function add_delta!(js::JournaledString, indices::Vector{Int}, 
         delta_type::DeltaType, position::Int, data::Any)
@@ -284,18 +301,20 @@ function add_delta!(js::JournaledString, indices::Vector{Int},
 end
 
 """
-Add a JournalEntry to indices.
+Adds a JournalEntry to indices.
 
-Args: 
-    js: JournaledString structure. 
-    indices: Indices to update. 
-    entry: JournalEntry object.
+# Args: 
+   - `js`: JournaledString structure. 
+   - `indices`: Indices to update. 
+   - `entry`: JournalEntry object.
 
-Returns: 
-    None (modifies JournaledString).
+# Returns: 
+   - None (modifies JournaledString).
 
-Examples: 
+# Examples: 
+```julia-repl
     julia> add_delta!(js, [1], entry) 
+```
 """
 function add_delta!(js::JournaledString, indices::Vector{Int}, 
     entry::JournalEntry)
@@ -308,17 +327,19 @@ for idx in indices
 end
 
 """
-Remove a delta by time key.
+Removes a delta by time key.
 
-Args: 
-    js: JournaledString structure. 
-    time: Time key of the delta.
+# Args: 
+   - `js`: JournaledString structure. 
+   - `time`: Time key of the delta.
 
-Returns: 
-    None (modifies JournaledString).
+# Returns: 
+   - None (modifies JournaledString).
 
-Examples: 
+# Examples: 
+```julia-repl
     julia> remove_delta!(js, 5) 
+```
 """
 function remove_delta!(js::JournaledString, indices::Vector{Int}, time::Int)
     for idx in indices
@@ -335,15 +356,17 @@ end
 """
 Apply a delta to a sequence.
 
-Args: 
-    reference: LongDNA{4} reference sequence. 
-    entry: JournalEntry delta.
+# Args: 
+   - `reference`: LongDNA{4} reference sequence. 
+   - `entry`: JournalEntry delta.
 
-Returns: 
-    Modified LongDNA{4} sequence.
+# Returns: 
+   - Modified LongDNA{4} sequence.
 
-Examples: 
+# Examples: 
+```julia-repl
     julia> apply_delta(ref_seq, entry) 
+```
 """
 function apply_delta(reference::LongDNA{4}, entry::JournalEntry)
     seq = copy(reference)
@@ -368,15 +391,17 @@ end
 """
 Apply multiple deltas to a sequence.
 
-Args: 
-    reference: LongDNA{4} reference sequence. 
-    delta: DeltaMap of JournalEntries.
+# Args: 
+   - `reference`: LongDNA{4} reference sequence. 
+   - `delta`: DeltaMap of JournalEntries.
 
-Returns: 
-    Modified LongDNA{4} sequence.
+# Returns: 
+   - Modified LongDNA{4} sequence.
 
-Examples: 
+# Examples: 
+```julia-repl
     julia> apply_delta(ref_seq, delta_map) 
+```
 """
 function apply_delta(reference::LongDNA{4}, delta::DeltaMap)
 
