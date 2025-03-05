@@ -1,11 +1,11 @@
 """
 Retrieve the full mutation history from a DeltaMap.
 
-Args: 
-    delta_map: The DeltaMap containing mutations.
+# Args: 
+   - `delta_map`: The DeltaMap containing mutations.
 
-Returns: 
-    A string listing all mutations with timestamps.
+# Returns: 
+   - A string listing all mutations with timestamps.
 """
 function get_mutation_history(delta_map::DeltaMap)
     mutation_history = ""
@@ -18,13 +18,13 @@ end
 """
 Retrieve mutations within a specific time interval.
 
-Args: 
-    delta_map: The DeltaMap containing mutations. 
-    time1: Start time of the interval. 
-    time2: End time of the interval.
+# Args: 
+   - `delta_map`: The DeltaMap containing mutations. 
+   - `time1`: Start time of the interval. 
+   - `time2`: End time of the interval.
 
-Returns: 
-    A string listing mutations within the given range.
+# Returns: 
+   - A string listing mutations within the given range.
 """
 function get_mutation_interval(delta_map::DeltaMap, time1::Int, time2::Int)
     mutation_interval = ""
@@ -39,12 +39,12 @@ end
 """
 Get sequences at a specific time in a JournaledString.
 
-Args: 
-    jst: The JournaledString to extract sequences from. 
-    time: The time point for reconstruction.
+# Args: 
+   - `jst`: The JournaledString to extract sequences from. 
+   - `time`: The time point for reconstruction.
 
-Returns: 
-    A vector of LongDNA{4} sequences at the given time.
+# Returns: 
+   - A vector of LongDNA{4} sequences at the given time.
 """
 function get_sequences_at_time(jst::JournaledString, time::Int)
     sequences_at_time = Vector{LongDNA{4}}(undef, length(jst.deltaMap))
@@ -64,12 +64,12 @@ end
 """
 Simulate a mutation in a JournaledString.
 
-Args: 
-    jst: The JournaledString to modify. 
-    index: The index in the delta map. 
-    entry: The JournalEntry mutation to add.
+# Args: 
+   - `jst`: The JournaledString to modify. 
+   - `index`: The index in the delta map. 
+   - `entry`: The JournalEntry mutation to add.
 
-Modifies: 
+# Modifies: 
     The JournaledString in place.
 """
 function simulate_mutation!(jst::JournaledString, index::Int,
@@ -80,13 +80,13 @@ end
 """
 Remove a mutation at a specific time.
 
-Args: 
-    jst: The JournaledString to modify. 
-    indices: vector of indices
-    time: The timestamp of the mutation to remove.
+# Args: 
+   - `jst`: The JournaledString to modify. 
+   - `indices`: vector of indices
+   - `time`: The timestamp of the mutation to remove.
 
-Modifies: 
-    The JournaledString in place.
+# Modifies: 
+   - The JournaledString in place.
 """
 function remove_mutation!(jst::JournaledString, indices::Vector{Int}, time::Int)
     remove_delta!(jst.deltaMap,indices, time)
@@ -95,13 +95,13 @@ end
 """
 Check if two JournaledStrings are equal.
 
-Args: 
-    jst1: The first JournaledString. 
-    jst2: The second JournaledString.
+# Args: 
+   - `jst1`: The first JournaledString. 
+   - `jst2`: The second JournaledString.
 
-Returns: 
-    `true` if both have identical reference, time, and deltas.
-    `false` otherwise
+# Returns: 
+   - `true` if both have identical reference, time, and deltas.
+   - `false` otherwise
 """
 function is_equal(jst1::JournaledString, jst2::JournaledString)::Bool
     if hash(jst1.reference) != hash(jst2.reference)
@@ -116,11 +116,11 @@ end
 """
 Print search results from a JournaledString.
 
-Args: 
-    results: A dictionary mapping delta map indices to match ranges.
+# Args: 
+   - `results`: A dictionary mapping delta map indices to match ranges.
 
-Output: 
-    Prints matches or indicates no matches.
+# Output: 
+   - Prints matches or indicates no matches.
 """
 function print_results(results::Dict{Int64, Vector{UnitRange{Int64}}})
     for i in 1:length(results)
@@ -136,11 +136,11 @@ end
 """
 Print search results from a Journaled String Tree (JST).
 
-Args: 
-    results: A dictionary mapping node names to match ranges.
+# Args: 
+   - `results`: A dictionary mapping node names to match ranges.
 
-Output: 
-    Prints matches or indicates no matches.
+# Output: 
+   - Prints matches or indicates no matches.
 """
 function print_results(results::Dict{String, Vector{UnitRange{Int64}}})
     for (name, _) in results
