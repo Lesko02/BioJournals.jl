@@ -17,13 +17,13 @@ end
 """
 Find all approximate matches of a query in a DNA sequence.
 
-Args: 
-    query: The search query. 
-    tolerance: Allowed mismatch percentage. 
-    seq: The LongDNA{4} sequence to search in.
+# Args: 
+   - `query`: The search query. 
+   - `tolerance`: Allowed mismatch percentage. 
+   - `seq`: The LongDNA{4} sequence to search in.
 
-Returns: 
-    A vector of UnitRanges representing match positions.
+# Returns: 
+   - A vector of UnitRanges representing match positions.
 """
 function approximate_findall(query, tolerance::Int64, seq::LongDNA{4})
     results = UnitRange{Int64}[]
@@ -38,12 +38,12 @@ end
 """
 Perform approximate search in a JournaledString.
 
-Args: 
-    jss: The JournaledString to search in. 
-    needle: The LongDNA{4} sequence to find.
+# Args: 
+   - `jss`: The JournaledString to search in. 
+   - `needle`: The LongDNA{4} sequence to find.
 
-Returns: 
-    A dictionary mapping time points to match ranges.
+# Returns: 
+   - A dictionary mapping time points to match ranges.
 """
 function approximate_search(jss::JournaledString, needle::LongDNA{4})
     query = ApproximateSearchQuery(needle)
@@ -85,16 +85,16 @@ end
 """
 Perform approximate search in a JournaledString with tolerance.
 
-Args: 
-    jss: The JournaledString to search in. 
-    needle: The LongDNA{4} sequence to find. 
-    tol: Allowed mismatch percentage (1-99%).
+# Args: 
+   - `jss`: The JournaledString to search in. 
+   - `needle`: The LongDNA{4} sequence to find. 
+   - `tol`: Allowed mismatch percentage (1-99%).
 
-Returns: 
-    A dictionary mapping time points to match ranges.
+# Returns: 
+   - A dictionary mapping time points to match ranges.
 
-Errors: 
-    Throws an error if tolerance is ≤0% or ≥100%.
+# Errors: 
+   - Throws an error if tolerance is ≤0% or ≥100%.
 """
 function approximate_search(jss::JournaledString, needle::LongDNA{4},
     tol::Int64)
@@ -144,11 +144,11 @@ end
 """
 Perform approximate search in a Journaled String Tree (JST).
 
-Args: 
-    jst: The JSTree to search in. 
-    needle: The LongDNA{4} sequence to find.
+# Args: 
+   - `jst`: The JSTree to search in. 
+   - `needle`: The LongDNA{4} sequence to find.
 
-Returns: 
+# Returns: 
     A dictionary mapping node names to match ranges.
 """
 function approximate_search(jst::JSTree, needle::LongDNA{4})
@@ -213,12 +213,12 @@ end
 """
 Perform exact search in a JournaledString.
 
-Args: 
-    jss: The JournaledString to search in. 
-    needle: The LongDNA sequence to find.
+# Args: 
+   - `jss`: The JournaledString to search in. 
+   - `needle`: The LongDNA sequence to find.
 
-Returns: 
-    A dictionary mapping time points to exact match ranges.
+# Returns: 
+   - A dictionary mapping time points to exact match ranges.
 """
 function exact_search(jss::JournaledString, needle::LongDNA )
     results = Dict(i => UnitRange{Int64}[] for i in 1:length(jss.deltaMap))
@@ -237,12 +237,12 @@ end
 """
 Perform exact search in a Journaled String Tree (JST).
 
-Args: 
-    jst: The JSTree to search in. 
-    needle: The LongDNA{4} sequence to find.
+# Args: 
+   - `jst`: The JSTree to search in. 
+   - `needle`: The LongDNA{4} sequence to find.
 
-Returns: 
-    A dictionary mapping node names to exact match ranges.
+# Returns: 
+   - A dictionary mapping node names to exact match ranges.
 """
 function exact_search(jst::JSTree, needle::LongDNA{4})
     indexMatrix = Dict{String, Vector{UnitRange{Int64}}}()
