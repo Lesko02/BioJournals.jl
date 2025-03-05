@@ -101,6 +101,7 @@ Args:
 
 Returns: 
     `true` if both have identical reference, time, and deltas.
+    `false` otherwise
 """
 function is_equal(jst1::JournaledString, jst2::JournaledString)::Bool
     if hash(jst1.reference) != hash(jst2.reference)
