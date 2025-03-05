@@ -16,7 +16,7 @@ Examples:
 
 function insert!(seq::LongDNA{4}, pos::Int, subseq::LongDNA)
     for symbol in subseq
-        BioJournals.insert!(seq, pos, symbol)
+        BioSequences.insert!(seq, pos, symbol)
     end
     return seq
 end
@@ -37,7 +37,7 @@ Examples:
 """
 function delete_at!(seq::LongDNA, pos_range::UnitRange{Int})
     for i in reverse(pos_range)
-        BioJournals.deleteat!(seq, i)
+        BioSequences.deleteat!(seq, i)
     end
     return seq
 end
