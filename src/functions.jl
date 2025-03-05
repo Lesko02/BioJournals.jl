@@ -10,7 +10,8 @@ Args:
 Returns: Updated LongDNA{4} sequence.
 
 Examples: 
-    insert!(LongDNA{4}("ACGT"), 2, LongDNA("CG")) LongDNA{4}("ACCGT") 
+    julia> insert!(LongDNA{4}("ACGT"), 2, LongDNA("CG")) 
+    LongDNA{4}("ACCGT") 
 """
 
 function insert!(seq::LongDNA{4}, pos::Int, subseq::LongDNA)
@@ -31,7 +32,7 @@ Returns:
     Updated LongDNA sequence.
 
 Examples: 
-    delete_at!(LongDNA("ACGTACGT"), 3:5) 
+    julia> delete_at!(LongDNA("ACGTACGT"), 3:5) 
     LongDNA("ACACGT") 
 """
 function delete_at!(seq::LongDNA, pos_range::UnitRange{Int})
@@ -53,7 +54,7 @@ Returns:
     Updated LongDNA{4} sequence.
 
 Examples: 
-    structure_variation!(LongDNA{4}("ACGT"), 4, LongDNA("TT")) 
+    julia> structure_variation!(LongDNA{4}("ACGT"), 4, LongDNA("TT")) 
     LongDNA{4}("ACGTTT") 
 """
 
@@ -91,7 +92,7 @@ Returns:
     Updated LongDNA{4} sequence.
 
 Examples: 
-    copy_number_variation!(LongDNA{4}("ACGT"), 2, (LongDNA{4}("GG"), 3)) 
+    julia> copy_number_variation!(LongDNA{4}("ACGT"), 2, (LongDNA{4}("GG"), 3)) 
     LongDNA{4}("ACGGGGGGT") 
 """
 # Implementation of CNV
@@ -116,7 +117,7 @@ Returns:
     Flattened sequence.
 
 Examples: 
-    flatten(tree, "child_node") 
+    julia> flatten(tree, "child_node") 
     LongDNA{4}("ACGT") 
 """
 
@@ -144,7 +145,7 @@ Returns:
     None (prints tree).
 
 Examples: 
-    print_tree(tree) 
+    julia> print_tree(tree) 
     |- root
        |- child1
        |- child2 
@@ -170,7 +171,7 @@ Returns:
     None (prints sequences).
 
 Examples: 
-    print_sequences(tree) 
+    julia> print_sequences(tree) 
     root: ACGT... 
     child1: ACG... 
 """
@@ -194,7 +195,7 @@ Returns:
     None (prints sequences).
 
 Examples: 
-    print_sequences(jst) 
+    julia> print_sequences(jst) 
     Sequence 1: ACGT... 
 """
 
@@ -215,7 +216,7 @@ Returns:
     Concatenated sequences.
 
 Examples: 
-    build_sequences(js) 
+    julia> build_sequences(js) 
     "Sequence 1: ACGT...
     Sequence 2: TGCA...
     " 
@@ -239,7 +240,7 @@ Returns:
     None (prints deltas).
 
 Examples: 
-    print_deltas(js) 
+    julia> print_deltas(js) 
     String number 1: 
       [time=1] JournalEntry: ... 
 """
@@ -266,7 +267,7 @@ Returns:
     None (modifies JournaledString).
 
 Examples: 
-    add_delta!(js, [1, 2], DeltaTypeIns, 3, "AC") 
+    julia> add_delta!(js, [1, 2], DeltaTypeIns, 3, "AC") 
 """
 function add_delta!(js::JournaledString, indices::Vector{Int}, 
         delta_type::DeltaType, position::Int, data::Any)
@@ -294,7 +295,7 @@ Returns:
     None (modifies JournaledString).
 
 Examples: 
-    add_delta!(js, [1], entry) 
+    julia> add_delta!(js, [1], entry) 
 """
 function add_delta!(js::JournaledString, indices::Vector{Int}, 
     entry::JournalEntry)
@@ -317,7 +318,7 @@ Returns:
     None (modifies JournaledString).
 
 Examples: 
-    remove_delta!(js, 5) 
+    julia> remove_delta!(js, 5) 
 """
 function remove_delta!(js::JournaledString, indices::Vector{Int}, time::Int)
     for idx in indices
@@ -342,7 +343,7 @@ Returns:
     Modified LongDNA{4} sequence.
 
 Examples: 
-    apply_delta(ref_seq, entry) 
+    julia> apply_delta(ref_seq, entry) 
 """
 function apply_delta(reference::LongDNA{4}, entry::JournalEntry)
     seq = copy(reference)
@@ -375,7 +376,7 @@ Returns:
     Modified LongDNA{4} sequence.
 
 Examples: 
-    apply_delta(ref_seq, delta_map) 
+    julia> apply_delta(ref_seq, delta_map) 
 """
 function apply_delta(reference::LongDNA{4}, delta::DeltaMap)
 
