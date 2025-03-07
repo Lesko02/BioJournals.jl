@@ -1,3 +1,4 @@
+#= NotYetCoded
 function horspool_find(jss::JournaledString, needle::LongDNA{4})
     # Yet to be coded
 end
@@ -13,6 +14,7 @@ end
 function myers_ukkoken_find(jst::JSTree, needle::LongDNA{4})
     # Yet to be coded
 end
+=#
 
 """
 Find all approximate matches of a query in a DNA sequence.
