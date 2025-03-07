@@ -114,6 +114,23 @@ return hash(jst1.deltaMap)==hash(jst2.deltaMap)
 end
 
 """
+Check if two Journaled String Trees (JSTrees) are equal.
+
+Args: 
+    jst1: The first JSTree. 
+    jst2: The second JSTree.
+
+Returns: 
+    `true` if both trees have identical root sequences and children.
+"""
+function is_equal(jst1::JSTree, jst2::JSTree)::Bool
+    if hash(jst1.root) != hash(jst2.root)
+        return false
+    end
+    return hash(jst1.children)==hash(jst2.children)
+end
+
+"""
 Print search results from a JournaledString.
 
 # Args: 
