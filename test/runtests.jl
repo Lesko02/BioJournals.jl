@@ -96,6 +96,19 @@ Sequence 10: AGATCGAGCGAGCTAGCGACTCAG"
         9 => [12:15],
         10 => [12:15]
     )
+
+    test_return3= Dict(
+        1 => [16:18, 13:15, 20:23, 9:11],
+        2 => [16:18, 13:15, 20:23, 9:11],
+        3 => [8:11, 13:15],
+        4 => [8:11, 13:15],
+        5 => [8:11, 13:15],
+        6 => [8:11, 13:15],
+        7 => [8:11, 13:15],
+        8 => [8:11, 13:15],
+        9 => [8:11, 13:15],
+        10 => [8:11, 13:15]
+    )
     
     needle = LongDNA{4}("AAAAAAAAAA")
     @test exact_search(js1, needle) == test_return
@@ -103,6 +116,28 @@ Sequence 10: AGATCGAGCGAGCTAGCGACTCAG"
     needle2 = LongDNA{4}("GCTA")
     @test exact_search(js1, needle2) == test_return2
     
+
+    @test approximate_search(js1, needle) == test_return
+    
+    @test approximate_search(js1, needle2) == test_return3
+
+    #tree section
+    test_return4 = Dict{String, Vector{UnitRange{Int64}}}(
+        name => UnitRange{Int64}[] for name in keys(tree2.children))
+
+    test_return5= Dict(
+        "child1" => [16:19],
+        "root" => [],
+        "child2" => [20:23],
+        "child3" => [16:19],
+        "child5" => [16:19],
+        "child4" => [16:19]
+    )
+
+    @test exact_search(tree2, needle) == test_return4
+
+    @test exact_search(tree2, needle2) == test_return5
+
 # end Test of search
 end
 
