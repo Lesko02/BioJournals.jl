@@ -17,7 +17,7 @@ Uses the BioJournals insert.
 ```
 """
 function insert!(seq::LongDNA{4}, pos::Int, subseq::LongDNA)
-    for symbol in subseq
+    for symbol in reverse(subseq)
         BioSequences.insert!(seq, pos, symbol)
     end
     return seq
