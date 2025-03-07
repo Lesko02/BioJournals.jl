@@ -20,10 +20,10 @@ Represents a single modification in a journaled sequence.
    - `time`: Time key for ordering modifications.
 """
 struct JournalEntry
-    delta_type::DeltaType    
-    position::Int64          
-    data::Any                
-    time::Int                
+   delta_type::DeltaType    
+   position::Int64          
+   data::Any                
+   time::Int                
 end
 
 """
@@ -50,13 +50,13 @@ A DNA sequence with associated modifications.
    - Initializes with `current_time` set to 0.
 """
 mutable struct JournaledString
-    reference::LongDNA{4}
-    deltaMap::Vector{DeltaMap}
-    current_time::Int
+   reference::LongDNA{4}
+   deltaMap::Vector{DeltaMap}
+   current_time::Int
 end
 
 function JournaledString(reference::LongDNA{4}, deltaMap::Vector{DeltaMap})
-    JournaledString(reference, deltaMap, 0)
+   JournaledString(reference, deltaMap, 0)
 end
 
 """
@@ -68,9 +68,9 @@ A node in a Journaled String Tree (JST).
    - `name`: Name of the node.
 """
 struct JSTNode
-    parent::Union{Nothing, JSTNode}
-    deltaMap::Union{Nothing, DeltaMap}
-    name::String
+   parent::Union{Nothing, JSTNode}
+   deltaMap::Union{Nothing, DeltaMap}
+   name::String
 end
 
 """
@@ -85,13 +85,13 @@ A Journaled String Tree (JST).
    - Initializes with a `root` node named "root".
 """
 struct JSTree
-    root::LongDNA{4};
-    children::Dict{String, JSTNode}
+   root::LongDNA{4};
+   children::Dict{String, JSTNode}
  end
 
  function JSTree(root_sequence::LongDNA{4})
-    root_node = JSTNode(nothing, nothing, "root")
-    return JSTree(root_sequence, Dict("root" => root_node))
+   root_node = JSTNode(nothing, nothing, "root")
+   return JSTree(root_sequence, Dict("root" => root_node))
 end
 
 """
@@ -110,15 +110,15 @@ Adds a new node to a JSTree.
    - Throws an error if the `parent` node does not exist.
 """
 function add_node(tree::JSTree, parent_name::String, deltas::DeltaMap, 
-    node_name::String)
+   node_name::String)
 
-        if !haskey(tree.children, parent_name)
-            error("Parent node '$parent_name' does not exist.")
-        else
-            parent_node = tree.children[parent_name]
-            new_node = JSTNode(parent_node, deltas, node_name)
-        end
-    tree.children[node_name] = new_node
+   if !haskey(tree.children, parent_name)
+      error("Parent node '$parent_name' does not exist.")
+   else
+      parent_node = tree.children[parent_name]
+      new_node = JSTNode(parent_node, deltas, node_name)
+   end
+   tree.children[node_name] = new_node
 end
 
 """
@@ -132,17 +132,17 @@ Removes a node and all its descendants from a JSTree.
 - Throws an error if the node does not exist or if attempting to remove the root.
 """
 function remove_node!(tree::JSTree, node_name::String)
-    if node_name == "root"
-        error("Cannot remove the root node.")
-    end
-    if !haskey(tree.children, node_name)
-        error("Node '$node_name' does not exist.")
-    end
+   if node_name == "root"
+      error("Cannot remove the root node.")
+   end
+   if !haskey(tree.children, node_name)
+      error("Node '$node_name' does not exist.")
+   end
 
-    for (child_name, child_node) in collect(tree.children)
-        if child_node.parent !== nothing && child_node.parent.name == node_name
-            remove_node!(tree, child_name)
-        end
-    end
-    delete!(tree.children, node_name)
+   for (child_name, child_node) in collect(tree.children)
+      if child_node.parent !== nothing && child_node.parent.name == node_name
+         remove_node!(tree, child_name)
+      end
+   end
+   delete!(tree.children, node_name)
 end
