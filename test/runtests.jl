@@ -45,12 +45,10 @@ using DataStructures
     add_node(tree, "child1", deltaMap[3], "child3")
     add_node(tree, "child1", deltaMap[4], "child4")
     add_node(tree, "child4", deltaMap[5], "child5")
-
     @test length(tree.children) == 6
-
     remove_node!(tree, "child1")
-
     @test length(tree.children) == 1
+    
 end
 
 ### runtests.jl ends here.
