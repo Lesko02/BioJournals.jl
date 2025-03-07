@@ -120,3 +120,29 @@ function add_node(tree::JSTree, parent_name::String, deltas::DeltaMap,
         end
     tree.children[node_name] = new_node
 end
+
+"""
+Removes a node and all its descendants from a JSTree.
+
+# Arguments
+- `tree::JSTree`: The journaled string tree.
+- `node_name::String`: The name of the node to remove.
+
+# Errors
+- Throws an error if the node does not exist or if attempting to remove the root.
+"""
+function remove_node!(tree::JSTree, node_name::String)
+    if node_name == "root"
+        error("Cannot remove the root node.")
+    end
+    if !haskey(tree.children, node_name)
+        error("Node '$node_name' does not exist.")
+    end
+
+    for (child_name, child_node) in collect(tree.children)
+        if child_node.parent !== nothing && child_node.parent.name == node_name
+            remove_node!(tree, child_name)
+        end
+    end
+    delete!(tree.children, node_name)
+end
