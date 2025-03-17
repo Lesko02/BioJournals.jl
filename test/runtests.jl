@@ -139,6 +139,13 @@ Sequence 10: AGATCGAGCGAGCTAGCGACTCAG"
     @test exact_search(tree2, needle2) == test_return5
 
 # end Test of search
+
+# Testing for Errors
+@test_throws ErrorException add_node(tree2, "child18", deltaMap[2] , "child2")
+@test_throws ErrorException remove_node!(tree1, "child18")
+@test_throws ErrorException remove_node!(tree1, "root")
+
+# end Testing for Errors
 end
 
 ### runtests.jl ends here.
