@@ -226,6 +226,7 @@ redirect_stdout(devnull) do
     print_deltas(js3)
     get_mutation_history(js3.deltaMap[1])
     get_mutation_interval(js3, 1, 5)
+    print_results(test_return)
     print_results(test_return2)
     print_results(test_return6)
 end
