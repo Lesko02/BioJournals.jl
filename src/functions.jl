@@ -341,15 +341,16 @@ Removes a delta by time key.
     julia> remove_delta!(js, 5) 
 ```
 """
-function remove_delta!(js::JournaledString, indices::Vector{Int}, time::Int)
-    for idx in indices
-        for entry in js.deltaMap[idx]
-            if entry[time] == time
+function remove_delta!(js::JournaledString, idx::Int, time::Int)
+    deletioncc = 0;
+        for (timer , entry) in js.deltaMap[idx]
+            if timer == time
                 delete!(js.deltaMap[idx], time)
-            else
-                error("No mutation found at time: $time" )
+                deletioncc += 1
             end
         end
+    if deletioncc == 0;
+        error("No mutation found at time: $time at index: $idx" )
     end
 end
 
