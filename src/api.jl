@@ -26,13 +26,15 @@ Retrieve mutations within a specific time interval.
 # Returns: 
    - A string listing mutations within the given range.
 """
-function get_mutation_interval(delta_map::DeltaMap, time1::Int, time2::Int)
+function get_mutation_interval(js::JournaledString, time1::Int, time2::Int)
     mutation_interval = ""
-    for (time, entry) in delta_map
-        if time1 <= time <= time2
-            mutation_interval *= "Time $time: $entry\n"
+    for i in 1:length(js.deltaMap)
+        for (time, entry) in js.deltaMap[i]
+            if time1 <= time <= time2
+                mutation_interval *= "Time $time: $entry at index $i\n"
+            end
         end
-    end
+    end    
     return mutation_interval
 end
 
