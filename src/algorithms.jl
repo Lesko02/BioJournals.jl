@@ -121,7 +121,7 @@ function approximate_search(jss::JournaledString, needle::LongDNA{4},
         empty!(to_remove)
         for range in indexMatrix[i]
             
-            for ( _, entry) in jss.deltaMap[i]
+            for ( time, entry) in jss.deltaMap[i]
                     
                 if entry.position in range
                     seq = apply_delta(jss.reference, entry)
