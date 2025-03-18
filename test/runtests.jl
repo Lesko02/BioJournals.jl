@@ -154,6 +154,7 @@ Sequence 10: AGATCGAGCGAGCTAGCGACTCAG"
     @test approximate_search(js1, needle) == test_return
     @test approximate_search(js1, needle, 15) == test_return
     
+    @test approximate_search(js1, needle2, 5) == test_return3
     @test approximate_search(js1, needle2) == test_return3
 
     #tree section
