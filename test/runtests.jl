@@ -16,8 +16,12 @@ using DataStructures
 # Test of apply_delta
     entry1 = JournalEntry(DeltaTypeDel, 1, 24, 1)
     entry2 = JournalEntry(DeltaTypeSV, 24, LongDNA{4}("NN") , 2)
+    entry4 = JournalEntry(DeltaTypeCNV, 1, (LongDNA{4}("ATCG"), 2), 3)
     @test apply_delta(reference_seq, entry1) == LongDNA{4}("")
-    @test apply_delta(reference_seq, entry2) == LongDNA{4}("AGATCGAGCGAGCTAGCGACTCAGNN")
+    @test apply_delta(reference_seq, entry2) == 
+        LongDNA{4}("AGATCGAGCGAGCTAGCGACTCAGNN")
+    @test apply_delta(reference_seq, entry4) == 
+        LongDNA{4}("ATCGATCGAGATCGAGCGAGCTAGCGACTCAG") 
     @test reference_seq == apply_delta(reference_seq, deltaMap[10])
     @test reference_seq != apply_delta(reference_seq, deltaMap[1])
     @test reference_seq != apply_delta(reference_seq, deltaMap[2])
@@ -210,16 +214,17 @@ add_delta!(js3, [3, 4], entry3)
 simulate_mutation!(js3, 5, entry3)
 remove_mutation!(js3, 5, 23)
 remove_delta!(js3, 3, 5)
+
 @test get_sequences_at_time(js3, 3) == test_return_time
 @test_throws ErrorException remove_delta!(js3, 1, 15)
 
 redirect_stdout(devnull) do
     print_sequences(js3)
     print_sequences(tree2)
-    print_tree(tree1)
+    print_tree(tree2)
     print_deltas(js3)
     get_mutation_history(js3.deltaMap[1])
-    get_mutation_interval(js3.deltaMap[1], 1, 2)
+    get_mutation_interval(js3, 1, 5)
     print_results(test_return2)
     print_results(test_return6)
 end
