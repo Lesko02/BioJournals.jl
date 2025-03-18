@@ -31,10 +31,16 @@ using DataStructures
     add_delta!(js1, [1, 2], DeltaTypeIns, 8, "CGTA")
     add_delta!(js2, [1, 2], DeltaTypeIns, 8, "CGTA")
 
+    jst2 = deepcopy(jst)
+    jst2.reference = LongDNA{4}("AGATCGAGCGAGCTAGCGACTCAGCCCCCC")
+
     @test (js1==js2) == false
     @test (js1==js1) == true
     @test is_equal(js1, js2) == true
     @test Base.isequal(js1, js2) == false
+    @test is_equal(jst, js1) == false
+    @test is_equal(jst, jst2) == false
+
 
 # end Test of comparisons JSS
 
@@ -53,8 +59,17 @@ using DataStructures
     add_node(tree2, "child1", deltaMap[4], "child4")
     add_node(tree2, "child4", deltaMap[5], "child5")
 
+    treecpy = JSTree(LongDNA{4}("AGATCGAGCGAGCTAGCGACTCAGCCCCCC"))
+    add_node(tree1, "root", deltaMap[1], "child1")
+    add_node(tree1, "child1", deltaMap[2] , "child2")
+    add_node(tree1, "child1", deltaMap[3], "child3")
+    add_node(tree1, "child1", deltaMap[4], "child4")
+    add_node(tree1, "child4", deltaMap[5], "child5")
+
     @test is_equal(tree1, tree2) == true
     @test Base.isequal(tree1, tree2) == false
+    @test is_equal(tree1, treecpy) == false
+
 #end Test of comparisons JST
 
     test_return_build = "Sequence 1: AGATCGACGTAGCGAGCTAGCGACTCAG
@@ -118,6 +133,7 @@ Sequence 10: AGATCGAGCGAGCTAGCGACTCAG"
     
 
     @test approximate_search(js1, needle) == test_return
+    @test approximate_search(js1, needle, 15) == test_return
     
     @test approximate_search(js1, needle2) == test_return3
 
@@ -134,9 +150,20 @@ Sequence 10: AGATCGAGCGAGCTAGCGACTCAG"
         "child4" => [16:19]
     )
 
+    test_return6 = Dict(
+        "child1" => [16:18, 13:15, 20:23, 9:11],
+        "root" => [16:18, 8:11, 13:15, 20:23, 9:11],
+        "child2" => [9:11, 13:15, 24:27, 20:22, 16:18, 20:23],
+        "child3" => [20:23, 8:11, 13:15, 24:27, 20:22, 9:11, 16:18],
+        "child5" => [20:23, 8:11, 13:15, 24:27, 20:22, 9:11, 16:18],
+        "child4" => [13:15, 24:27, 20:22, 20:23, 16:18]
+    )
+
     @test exact_search(tree2, needle) == test_return4
 
     @test exact_search(tree2, needle2) == test_return5
+
+    @test approximate_search(tree2, needle2) == test_return6
 
 # end Test of search
 
@@ -144,8 +171,35 @@ Sequence 10: AGATCGAGCGAGCTAGCGACTCAG"
 @test_throws ErrorException add_node(tree2, "child18", deltaMap[2] , "child2")
 @test_throws ErrorException remove_node!(tree1, "child18")
 @test_throws ErrorException remove_node!(tree1, "root")
+@test_throws ErrorException approximate_search(js1, needle, 115) == test_return
 
 # end Testing for Errors
+
+# "Testing" the prints to update the code coverage
+js3 = JournaledString(LongDNA{4}("AGATCGAGCGAGCTAGCGACTCAG"),
+[SortedDict{Int, JournalEntry}() for _ in 1:10], 0)
+
+add_delta!(js3, [1, 2], DeltaTypeIns, 8, "CGTA")
+add_delta!(js3, [10], DeltaTypeSnp, 21, 'C')
+add_delta!(js3, [4], DeltaTypeSV, 24, dna"NNNNN")
+add_delta!(js3, [1, 3], DeltaTypeCNV, 1, (LongDNA{4}("ATCG"), 2))
+add_delta!(js3, [5, 6, 7], DeltaTypeIns, 5, "GTC")
+add_delta!(js3, [8, 9], DeltaTypeDel, 10, 2)
+add_delta!(js3, [4, 2], DeltaTypeSnp, 18, 'T')
+add_delta!(js3, [1, 3], DeltaTypeSnp, 18, 'G')
+add_delta!(js3, [6, 8], DeltaTypeSV, 20, dna"CCTG")
+add_delta!(js3, [5, 7, 10], DeltaTypeDel, 3, 2)
+
+redirect_stdout(devnull) do
+    print_sequences(js3)
+    print_tree(tree1)
+    print_deltas(js3)
+    get_mutation_history(js3.deltaMap[1])
+    get_mutation_interval(js3.deltaMap[1], 1, 2)
+    print_results(test_return2)
+    print_results(test_return6)
+end
+# end "Testing" the prints to update the code coverage
 end
 
 ### runtests.jl ends here.
