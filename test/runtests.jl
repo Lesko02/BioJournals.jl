@@ -160,10 +160,11 @@ Sequence 10: AGATCGAGCGAGCTAGCGACTCAG"
     #tree section
     test_return4 = Dict{String, Vector{UnitRange{Int64}}}(
         name => UnitRange{Int64}[] for name in keys(tree2.children))
-
-    test_return5= Dict(
+    
+    voidvector = UnitRange{Int64}[]
+    test_return5 = Dict( 
         "child1" => [16:19],
-        "root" => [],
+        "root"   => voidvector,
         "child2" => [20:23],
         "child3" => [16:19],
         "child5" => [16:19],
