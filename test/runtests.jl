@@ -86,6 +86,21 @@ Sequence 10: AGATCGAGCGAGCTAGCGACTCAG"
     @test strip(build_sequences(jst)) == strip(test_return_build)
     #done like this to avoid withespace problems
 
+    test_return_time = Vector{LongDNA{4}}()
+    test_return_time = [
+        dna"AGATCGACGTAGCGAGCTAGCGACTCAG",
+        dna"AGATCGACGTAGCGAGCTAGCGACTCAG",
+        dna"AGATCGAGCGAGCTAGCGACTCAG",
+        dna"AGATCGAGCGAGCTAGCGACTCAGNNNNN",
+        dna"AGATCGAGCGAGCTAGCGACTCAG",
+        dna"AGATCGAGCGAGCTAGCGACTCAG",
+        dna"AGATCGAGCGAGCTAGCGACTCAG",
+        dna"AGATCGAGCGAGCTAGCGACTCAG",
+        dna"AGATCGAGCGAGCTAGCGACTCAG",
+        dna"AGATCGAGCGAGCTAGCGACCCAG"
+    ]
+
+
 # Test of flatten
     @test flatten(tree1, "child1") == LongDNA{4}("AGATCGACGTAGCGAGCTAGCGACTCAG")
 # end Test of flatten
@@ -192,7 +207,10 @@ add_delta!(js3, [5, 7, 10], DeltaTypeDel, 3, 2)
 add_delta!(js3, [4], DeltaTypeSV, 35, dna"ACTGACTG")
 entry3 = JournalEntry(DeltaTypeIns, 3, "AGT", 10)
 add_delta!(js3, [3, 4], entry3)
+simulate_mutation!(js3, 5, entry3)
+remove_mutation!(js3, 5, 23)
 remove_delta!(js3, 3, 5)
+@test get_sequences_at_time(js3, 3) == test_return_time
 @test_throws ErrorException remove_delta!(js3, 1, 15)
 
 redirect_stdout(devnull) do
