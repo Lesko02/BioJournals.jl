@@ -228,6 +228,7 @@ redirect_stdout(devnull) do
     get_mutation_interval(js3, 1, 5)
     print_results(test_return)
     print_results(test_return2)
+    print_results(test_return5)
     print_results(test_return6)
 end
 # end "Testing" the prints to update the code coverage
