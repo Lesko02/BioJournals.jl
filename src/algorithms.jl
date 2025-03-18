@@ -171,8 +171,6 @@ function approximate_search(jst::JSTree, needle::LongDNA{4})
         indexMatrix[name] = vector
     end
 
-    println(vector)
-
     for (name, node) in jst.children
 
         for range in indexMatrix[name]
