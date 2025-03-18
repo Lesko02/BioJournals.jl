@@ -49,7 +49,7 @@ Get sequences at a specific time in a JournaledString.
 function get_sequences_at_time(jst::JournaledString, time::Int)
     sequences_at_time = Vector{LongDNA{4}}(undef, length(jst.deltaMap))
     for i in 1:length(jst.deltaMap)
-        filtered_delta = DeltaMap()
+        filtered_delta = DeltaMap(Base.Order.Forward)
         for (entry_time, entry) in jst.deltaMap[i]
             if entry_time > time
                 break
@@ -74,7 +74,7 @@ Simulate a mutation in a JournaledString.
 """
 function simulate_mutation!(jst::JournaledString, index::Int,
      entry::JournalEntry)
-   add_delta!(jst.deltaMap, index, entry)
+   add_delta!(jst, [index], entry)
 end
 
 """
@@ -88,8 +88,8 @@ Remove a mutation at a specific time.
 # Modifies: 
    - The JournaledString in place.
 """
-function remove_mutation!(jst::JournaledString, indices::Vector{Int}, time::Int)
-    remove_delta!(jst.deltaMap,indices, time)
+function remove_mutation!(jst::JournaledString, index::Int, time::Int)
+    remove_delta!(jst ,index, time)
 end
 
 """
