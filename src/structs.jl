@@ -67,7 +67,7 @@ A node in a Journaled String Tree (JST).
    - `deltaMap`: Modifications applied at this node (or nothing). 
    - `name`: Name of the node.
 """
-struct JSTNode
+mutable struct JSTNode
    parent::Union{Nothing, JSTNode}
    deltaMap::Union{Nothing, DeltaMap}
    name::String
@@ -85,7 +85,7 @@ A Journaled String Tree (JST).
    - Initializes with a `root` node named "root".
 """
 struct JSTree
-   root::LongDNA{4};
+   root::LongDNA{4}
    children::Dict{String, JSTNode}
  end
 
@@ -146,3 +146,24 @@ function remove_node!(tree::JSTree, node_name::String)
    end
    delete!(tree.children, node_name)
 end
+
+function get_parent(jst::JSTree, node_name::String)
+   node = jst.children[node_name]
+   return node.parent
+end
+
+function trim_node(jst::JSTree, node_name::String)
+   if node_name == "root"
+      error("Cannot trim the root node.")
+   end
+   if !haskey(jst.children, node_name)
+      error("Node '$node_name' does not exist.")
+   end
+   
+   for (child_name, child_node) in collect(jst.children)
+      if child_node.parent !== nothing && child_node.parent.name == node_name
+         child_node.parent = get_parent(jst, node_name)
+      end
+   end
+   delete!(jst.children, node_name)
+end 
