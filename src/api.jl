@@ -115,6 +115,12 @@ function is_equal(jst1::JournaledString, jst2::JournaledString)::Bool
 return hash(jst1.deltaMap)==hash(jst2.deltaMap)
 end
 
+# Multiple dispactch of == operator
+Base.:(==)(a::JSTNode, b::JSTNode) = 
+    a.name == b.name && 
+    hash(a.deltaMap) == hash(b.deltaMap) && 
+    a.parent == b.parent 
+
 """
 Check if two Journaled String Trees (JSTrees) are equal.
 
@@ -126,10 +132,22 @@ Returns:
     `true` if both trees have identical root sequences and children.
 """
 function is_equal(jst1::JSTree, jst2::JSTree)::Bool
-    if hash(jst1.root) != hash(jst2.root)
-        return false
+    # Compare root sequences (assumed immutable)
+    jst1.root != jst2.root && return false
+    
+    # Check child keys match
+    keys1 = sort(collect(keys(jst1.children)))
+    keys2 = sort(collect(keys(jst2.children)))
+    keys1 != keys2 && return false
+    
+    # Compare each child node structurally
+    for key in keys1
+        node1 = jst1.children[key]
+        node2 = jst2.children[key]
+        node1 != node2 && return false
     end
-    return hash(jst1.children)==hash(jst2.children)
+    
+    return true
 end
 
 """
