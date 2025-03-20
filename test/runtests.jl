@@ -233,6 +233,14 @@ redirect_stdout(devnull) do
     print_results(test_return6)
 end
 # end "Testing" the prints to update the code coverage
+
+# Test of trim_node
+@test length(tree2.children) == 6
+@test_throws ErrorException trim_node(tree2, "child18")
+@test_throws ErrorException trim_node(tree2, "root")
+trim_node(tree2, "child4")
+@test length(tree2.children) == 5
+# end Test of trim_node
 end
 
 ### runtests.jl ends here.
