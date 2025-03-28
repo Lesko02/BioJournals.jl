@@ -71,7 +71,7 @@ Get interactive help using the package directly from the REPL, use:
 ?JournaledString    # To view the docstring about the JournaledString type
 ```
 
-this produces this in the REPL:
+produces this in the REPL:
 
 ```console
 search: JournaledString JournalEntry unsafe_string
