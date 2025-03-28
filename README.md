@@ -1,8 +1,10 @@
 # BioJournals
 
+[![Julia](https://img.shields.io/badge/Julia-1.11.1-blue)](https://julialang.org/)
 [![Build Status](https://github.com/Lesko02/BioJournals.jl/actions/workflows/CI.yml/badge.svg?branch=main)](https://github.com/Lesko02/BioJournals.jl/actions/workflows/CI.yml?query=branch%3Amain)
 [![Coverage](https://codecov.io/gh/Lesko02/BioJournals.jl/branch/main/graph/badge.svg)](https://codecov.io/gh/Lesko02/BioJournals.jl)
-
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Project Status: WIP](https://www.repostatus.org/badges/latest/wip.svg)](https://www.repostatus.org/#wip)
 
 Simulators tracking mutations in a cell population, e.g., to study the
 evolution of a solid tumor, must manipulate many DNA/RNA sequences at
