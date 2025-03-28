@@ -23,8 +23,23 @@ proper API for its manipulation.  An important *key* identifying such
 sequences will be *time*.
 
 Similar data structures that have been proposed to solve similar
-problems (cf., [SeqAn](https://www.seqan.de/data-structures/), but
+problems (cf., [SeqAn](https://www.seqan.de/data-structures/)), but
 they target different problems that the one at hand.  Plus, we would
 like a **Julia** implementation to complement our other efforts in the
 (solid tumors) simulation arena.
+
+## Installation
+
+To install this package directly from GitHub, open the Julia REPL and 
+run:  
+
+```julia  
+using Pkg  
+Pkg.add(url="https://github.com/your-username/YourPackage.jl")  
+```
+
+Alternatively, use the Pkg REPL mode by pressing `]` and entering:
+```
+add https://github.com/Lesko02/BioJournals.jl
+```
 
