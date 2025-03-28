@@ -241,6 +241,26 @@ end
 trim_node(tree2, "child4")
 @test length(tree2.children) == 5
 # end Test of trim_node
+
+# Test of IO functions
+ioTestDict = Dict("Try1" => reference_seq)
+mktemp() do path, io
+    write_fasta(ioTestDict, path)
+    @test_throws ErrorException load_fasta("InvalidPATH.!/")
+    close(io)
+    ioTestDict2 = load_fasta(path)
+    @test ioTestDict == ioTestDict2
 end
 
+ioTestDict3 = Dict("Try2" => (reference_seq, "!A5@DECC>GID<7?BEGC?=:7!"))
+mktemp() do path, io
+    write_fastq(ioTestDict3, path)
+    @test_throws ErrorException load_fastq("InvalidPATH.!/")
+    close(io)
+    ioTestDict4 = load_fastq(path)
+    @test [x[1] for (id, x) in ioTestDict3] == [x[1] for (id, x) in ioTestDict4]
+end
+# end Test of IO functions
+
+end
 ### runtests.jl ends here.
