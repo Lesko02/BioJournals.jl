@@ -39,7 +39,22 @@ Pkg.add(url="https://github.com/your-username/YourPackage.jl")
 ```
 
 Alternatively, use the Pkg REPL mode by pressing `]` and entering:
-```
+
+```julia
 add https://github.com/Lesko02/BioJournals.jl
 ```
+## Usage
+Create and manipulate journaled sequences:
 
+```julia  
+using BioJournals
+
+reference_seq = LongDNA{4}("AGATCGAGCGAGCTAGCGACTCAG")            # Creating a reference sequence
+deltaMap = [SortedDict{Int, JournalEntry}() for _ in 1:2]         #Creating a DeltaMap object
+jst = JournaledString(reference_seq, deltaMap)                    # Inizialization
+
+add_delta!(jst, [1], DeltaTypeIns, 8, "CGTA")                     # Adding deltas such as Insertions
+add_delta!(jst, [2], DeltaTypeSnp, 10, 'C')                       # and Permutations
+
+print_sequences(jst)                                              # Printing the modified sequences
+```
