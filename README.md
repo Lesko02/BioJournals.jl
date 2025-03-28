@@ -36,7 +36,7 @@ run:
 
 ```julia  
 using Pkg  
-Pkg.add(url="https://github.com/your-username/YourPackage.jl")  
+Pkg.add(url="https://github.com/Lesko02/BioJournals.jl")  
 ```
 
 Alternatively, use the Pkg REPL mode by pressing `]` and entering:
