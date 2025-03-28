@@ -28,6 +28,7 @@ they target different problems that the one at hand.  Plus, we would
 like a **Julia** implementation to complement our other efforts in the
 (solid tumors) simulation arena.
 
+
 ## Installation
 
 To install this package directly from GitHub, open the Julia REPL and 
@@ -43,7 +44,10 @@ Alternatively, use the Pkg REPL mode by pressing `]` and entering:
 ```julia
 add https://github.com/Lesko02/BioJournals.jl
 ```
+
+
 ## Usage
+
 Create and manipulate journaled sequences:
 
 ```julia  
@@ -57,4 +61,36 @@ add_delta!(jst, [1], DeltaTypeIns, 8, "CGTA")                     # Adding delta
 add_delta!(jst, [2], DeltaTypeSnp, 10, 'C')                       # and Permutations
 
 print_sequences(jst)                                              # Printing the modified sequences
+```
+
+## Documentation
+
+Get interactive help using the package directly from the REPL, use:
+
+```julia
+?JournaledString    # To view the docstring about the JournaledString type
+```
+
+this produces this in the REPL:
+
+```console
+search: JournaledString JournalEntry unsafe_string
+
+  A DNA sequence with associated modifications.
+
+  Fields:
+  ≡≡≡≡≡≡≡
+
+    •  reference: Original LongDNA{4} sequence.
+
+    •  deltaMap: Vector of DeltaMaps storing modifications.
+
+    •  current_time: Current timestamp for modifications.
+
+  Constructor:
+  ≡≡≡≡≡≡≡≡≡≡≡≡
+
+  JournaledString(reference, deltaMap)
+
+    •  Initializes with current_time set to 0.
 ```
