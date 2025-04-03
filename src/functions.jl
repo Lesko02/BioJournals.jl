@@ -325,6 +325,63 @@ for idx in indices
     js.current_time += 1
     end
 end
+"""
+Add a mutation entry (delta) to a node in a Journaled String Tree (JSTree).
+
+# Args:
+   - `jst`: The JSTree to modify.
+   - `node_name`: The name of the node to which the delta is added.
+   - `delta_type`: The type of mutation (e.g., insertion, deletion).
+   - `position`: The position in the sequence where the mutation occurs.
+   - `data`: The data associated with the mutation.
+
+# Errors:
+   - Throws an error if attempting to add a delta to the root node.
+   - Throws an error if the specified node does not exist in the JSTree.
+   - Throws an error if the specified node lacks a delta map.
+"""
+function add_delta!(jst::JSTree, node_name::String, delta_type::DeltaType,
+     position::Int, data::Any)
+
+    if node_name == "root"
+        error("Cannot add delta to the root node.")
+    end
+    if !haskey(jst.children, node_name)
+        error("Node '$node_name' does not exist.")
+    end
+    node = jst.children[node_name]
+    deltaMap = node.deltaMap
+    next_time = isempty(deltaMap) ? 0 : maximum(keys(deltaMap)) + 1
+    new_entry = JournalEntry(delta_type, position, data, next_time)
+    deltaMap[next_time] = new_entry
+end
+"""
+Add a mutation entry (delta) to a node in a Journaled String Tree (JSTree).
+
+# Args:
+   - `jst`: The JSTree to modify.
+   - `node_name`: The name of the node to which the delta is added.
+   - `entry`: The JournalEntry to add.
+
+# Errors:
+   - Throws an error if attempting to add a delta to the root node.
+   - Throws an error if the specified node does not exist in the JSTree.
+   - Throws an error if the specified node lacks a delta map.
+"""
+function add_delta!(jst::JSTree, node_name::String, entry::JournalEntry)
+
+   if node_name == "root"
+       error("Cannot add delta to the root node.")
+   end
+   if !haskey(jst.children, node_name)
+       error("Node '$node_name' does not exist.")
+   end
+   node = jst.children[node_name]
+   deltaMap = node.deltaMap
+   next_time = isempty(deltaMap) ? 0 : maximum(keys(deltaMap)) + 1
+   entry.time == next_time
+   deltaMap[next_time] = entry
+end
 
 """
 Removes a delta by time key.
