@@ -263,7 +263,12 @@ end
 # Testing new apis
 @test_throws ErrorException add_delta!(tree2, "root", entry3)
 @test_throws ErrorException add_delta!(tree2, "nonesiste", entry3)
+@test_throws ErrorException add_delta!(tree2, "root", DeltaTypeSnp, 21, 'C')
+@test_throws ErrorException add_delta!(tree2, "nonesiste", DeltaTypeSnp, 21, 'C')
 add_delta!(tree2, "child1", DeltaTypeSnp, 21, 'C')
+add_delta!(tree2, "child1", entry3)
+add_node(tree2, "root", DeltaMap(), "child6")
+
 # end testing new apis
 end
 ### runtests.jl ends here.
