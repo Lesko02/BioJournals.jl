@@ -7,7 +7,7 @@ using DataStructures
 
 @testset "BioJournals.jl" begin
     reference_seq = LongDNA{4}("AGATCGAGCGAGCTAGCGACTCAG")
-    deltaMap = [SortedDict{Int, JournalEntry}() for _ in 1:10]
+    deltaMap = DeltaMap(10)
     jst = JournaledString(reference_seq, deltaMap)
     add_delta!(jst, [1, 2], DeltaTypeIns, 8, "CGTA")
     add_delta!(jst, [4, 9], DeltaTypeSnp, 10, 'C')
@@ -29,9 +29,8 @@ using DataStructures
 
 # Test of comparisons JSS
     js1 = JournaledString(reference_seq,
-    [SortedDict{Int, JournalEntry}() for _ in 1:10], 0)
-    js2 = JournaledString(reference_seq,
-    [SortedDict{Int, JournalEntry}() for _ in 1:10], 0)
+    DeltaMap(10), 0)
+    js2 = JournaledString(reference_seq, DeltaMap(10), 0)
     add_delta!(js1, [1, 2], DeltaTypeIns, 8, "CGTA")
     add_delta!(js2, [1, 2], DeltaTypeIns, 8, "CGTA")
 
@@ -198,7 +197,7 @@ Sequence 10: AGATCGAGCGAGCTAGCGACTCAG"
 
 # "Testing" the prints to update the code coverage
 js3 = JournaledString(LongDNA{4}("AGATCGAGCGAGCTAGCGACTCAG"),
-[SortedDict{Int, JournalEntry}() for _ in 1:10], 0)
+DeltaMap(10), 0)
 
 add_delta!(js3, [1, 2], DeltaTypeIns, 8, "CGTA")
 add_delta!(js3, [10], DeltaTypeSnp, 21, 'C')
@@ -261,6 +260,10 @@ mktemp() do path, io
     @test [x[1] for (id, x) in ioTestDict3] == [x[1] for (id, x) in ioTestDict4]
 end
 # end Test of IO functions
-
+# Testing new apis
+@test_throws ErrorException add_delta!(tree2, "root", entry3)
+@test_throws ErrorException add_delta!(tree2, "nonesiste", entry3)
+add_delta!(tree2, "child1", DeltaTypeSnp, 21, 'C')
+# end testing new apis
 end
 ### runtests.jl ends here.
