@@ -36,7 +36,11 @@ Sorted mapping of time keys to journal entries.
    - Corresponding `JournalEntry` objects.
 """
 const DeltaMap = SortedDict{Int, JournalEntry, Base.Order.ForwardOrdering}
-
+DeltaMap() = SortedDict{Int, JournalEntry, Base.Order.ForwardOrdering}()
+function DeltaMap(n::Int)
+   d = [SortedDict{Int, JournalEntry}() for _ in 1:n]
+   return d
+end
 """
 A DNA sequence with associated modifications.
 
