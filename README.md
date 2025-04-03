@@ -54,7 +54,7 @@ Create and manipulate journaled sequences:
 using BioJournals
 
 reference_seq = LongDNA{4}("AGATCGAGCGAGCTAGCGACTCAG")            # Creating a reference sequence
-deltaMap = [SortedDict{Int, JournalEntry}() for _ in 1:2]         # Creating a DeltaMap object
+deltaMap = DeltaMap(10)                                           # Creating a DeltaMap object
 jst = JournaledString(reference_seq, deltaMap)                    # Inizialization
 
 add_delta!(jst, [1], DeltaTypeIns, 8, "CGTA")                     # Adding deltas such as Insertions
