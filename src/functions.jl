@@ -379,8 +379,9 @@ function add_delta!(jst::JSTree, node_name::String, entry::JournalEntry)
    node = jst.children[node_name]
    deltaMap = node.deltaMap
    next_time = isempty(deltaMap) ? 0 : maximum(keys(deltaMap)) + 1
-   entry.time = next_time
-   deltaMap[next_time] = entry
+   new_entry = JournalEntry(entry.delta_type, entry.position, entry.data,
+   next_time)  
+   deltaMap[next_time] = new_entry
 end
 
 """
@@ -399,18 +400,53 @@ Removes a delta by time key.
 ```
 """
 function remove_delta!(js::JournaledString, idx::Int, time::Int)
-    deletioncc = 0;
+    deletioncc = 0
         for (timer , entry) in js.deltaMap[idx]
             if timer == time
                 delete!(js.deltaMap[idx], time)
                 deletioncc += 1
             end
         end
-    if deletioncc == 0;
+    if deletioncc == 0
         error("No mutation found at time: $time at index: $idx" )
     end
 end
 
+"""
+Removes a delta by time key.
+
+# Args: 
+   - `jst`: JSTree structure. 
+   - `node_name`: Name of the node.
+   - `time`: Time key of the delta.
+
+# Returns: 
+   - None (modifies JSTNode).
+
+# Examples: 
+```julia-repl
+    julia> remove_delta!(jst, "children1", 5) 
+```
+"""
+function remove_delta!(jst::JSTree, node_name::String, time::Int)
+    deletioncc = 0
+    if node_name == "root"
+        error("Cannot delete delta of the root node.")
+    end
+    if !haskey(jst.children, node_name)
+        error("Node '$node_name' does not exist.")
+    end
+
+    for (timer , entry) in jst.children[node_name].deltaMap
+        if timer == time
+            delete!(jst.children[node_name].deltaMap, time)
+            deletioncc += 1
+        end
+    end
+    if deletioncc == 0
+        error("No mutation found at time: $time at child: $node_name" )
+    end
+end
 """
 Apply a delta to a sequence.
 
