@@ -379,7 +379,7 @@ function add_delta!(jst::JSTree, node_name::String, entry::JournalEntry)
    node = jst.children[node_name]
    deltaMap = node.deltaMap
    next_time = isempty(deltaMap) ? 0 : maximum(keys(deltaMap)) + 1
-   entry.time == next_time
+   entry.time = next_time
    deltaMap[next_time] = entry
 end
 
