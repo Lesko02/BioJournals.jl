@@ -267,6 +267,11 @@ end
 @test_throws ErrorException add_delta!(tree2, "nonesiste", DeltaTypeSnp, 21, 'C')
 add_delta!(tree2, "child1", DeltaTypeSnp, 21, 'C')
 add_delta!(tree2, "child1", entry3)
+@test length(tree2.children["child1"].deltaMap) == 3
+println(tree2.children["child1"])
+@test_throws ErrorException remove_delta!(tree2, "child1", 3)
+remove_delta!(tree2, "child1", 2)
+@test length(tree2.children["child1"].deltaMap) == 2
 add_node(tree2, "root", DeltaMap(), "child6")
 
 # end testing new apis
