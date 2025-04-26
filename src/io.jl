@@ -1,3 +1,8 @@
+### -*- Mode: Julia -*-
+
+### io.jl
+
+
 """
 Loads sequences from a FASTA file into a dictionary.
 
@@ -14,6 +19,7 @@ function load_fasta(filename)
     if !isfile(filename)
         error("File '$filename' does not exist.")
     end
+    
     seqs = Dict{String, LongDNA{4}}()
     reader = open(FASTA.Reader, filename)
     for record in reader
@@ -25,15 +31,17 @@ function load_fasta(filename)
     return seqs
 end
 
+
 """
-Writes sequences to a FASTA file. Creates a new file if `filename` does 
-not exist.
+Writes sequences to a FASTA file.
+
+Creates a new file if `filename` does not exist.
 
 # Args:
    - `sequences`: A dictionary mapping sequence IDs to `LongDNA{4}` sequences.
    - `filename`: Path to the output FASTA file.
 """
-function write_fasta(sequences::Dict{String, LongDNA{4}}, filename::String)
+function write_fasta(sequences :: Dict{String, LongDNA{4}}, filename :: String)
     open(filename, "w") do io
         writer = FASTA.Writer(io, 70) 
         for (id, seq) in sequences
@@ -44,19 +52,22 @@ function write_fasta(sequences::Dict{String, LongDNA{4}}, filename::String)
     end
 end
 
+
 """
-Writes records to a FASTQ file. Creates a new file if `filename` does 
-not exist.
+Writes records to a FASTQ file.
+
+Creates a new file if `filename` does not exist.
 
 # Args:
-   - `records`: A dictionary mapping sequence IDs to tuples of `LongDNA{4}` 
+   - `records`: A dictionary mapping sequence IDs to tuples of `LongDNA{4}`
                 sequences and their quality scores.
    - `filename`: Path to the output FASTQ file.
 """
-function write_fastq(records::Dict{String, Tuple{LongDNA{4}, String}}, filename::String)
+function write_fastq(records :: Dict{String, Tuple{LongDNA{4}, String}},
+                     filename :: String)
     io = endswith(filename, ".gz") ? 
-         GzipCompressorStream(open(filename, "w")) : 
-         open(filename, "w")
+        GzipCompressorStream(open(filename, "w")) : 
+        open(filename, "w")
 
     try
         writer = FASTQ.Writer(io, true)
@@ -71,10 +82,10 @@ function write_fastq(records::Dict{String, Tuple{LongDNA{4}, String}}, filename:
 
             if length(seq_str) != length(qual_str)
                 error("""
-                Length mismatch in record $(repr(id)):
-                - Sequence: $(length(seq_str)) bases
-                - Quality: $(length(qual_str)) chars
-                """)
+                        Length mismatch in record $(repr(id)):
+                        - Sequence: $(length(seq_str)) bases
+                        - Quality: $(length(qual_str)) chars
+                      """)
             end
 
             record_data = Vector{UInt8}()
@@ -91,6 +102,7 @@ function write_fastq(records::Dict{String, Tuple{LongDNA{4}, String}}, filename:
     end
 end
 
+
 """
 Loads records from a FASTQ file into a dictionary.
 
@@ -104,7 +116,7 @@ Loads records from a FASTQ file into a dictionary.
 # Raises:
    - An error if the file does not exist.
 """
-function load_fastq(filename::String)
+function load_fastq(filename :: String)
     if !isfile(filename)
         error("File '$filename' does not exist.")
     end
@@ -125,3 +137,6 @@ function load_fastq(filename::String)
     end
     return records
 end
+
+
+### io.jl ends here.

@@ -1,50 +1,57 @@
+### -*- Mode: Julia -*-
+
+### functions.jl
+
+
 """
 Insert a subsequence into a DNA sequence.
 Uses the BioJournals insert.
 
-# Args: 
+# Args:
    - `seq`: A LongDNA{4} sequence to modify. 
    - `pos`: Position where the subsequence is inserted. 
    - `subseq`: A LongDNA sequence to insert.
 
-# Returns: 
+# Returns:
    - Updated LongDNA{4} sequence.
 
-# Examples: 
+# Examples:
 ```julia-repl
     julia> insert!(LongDNA{4}("ACGT"), 2, LongDNA("CG")) 
     LongDNA{4}("ACCGT") 
 ```
 """
-function insert!(seq::LongDNA{4}, pos::Int, subseq::LongDNA)
+function insert!(seq :: LongDNA{4}, pos :: Int, subseq :: LongDNA)
     for symbol in reverse(subseq)
         BioSequences.insert!(seq, pos, symbol)
     end
     return seq
 end
 
+
 """
 Delete a range of symbols from a DNA sequence.
 
-# Args: 
+# Args:
    - `seq`: A LongDNA sequence to modify. 
    - `pos_range`: Range of positions to delete.
 
-# Returns: 
+# Returns:
    - Updated LongDNA sequence.
 
-# Examples: 
+# Examples:
 ```julia-repl
     julia> delete_at!(LongDNA("ACGTACGT"), 3:5) 
     LongDNA("ACACGT") 
 ```
 """
-function delete_at!(seq::LongDNA, pos_range::UnitRange{Int})
+function delete_at!(seq :: LongDNA, pos_range :: UnitRange{Int})
     for i in reverse(pos_range)
         BioSequences.deleteat!(seq, i)
     end
     return seq
 end
+
 
 """
 Apply a structure variation to a DNA sequence.
@@ -63,16 +70,18 @@ Apply a structure variation to a DNA sequence.
     LongDNA{4}("ACGTTT") 
 ```
 """
-function structure_variation!(seq::LongDNA{4}, pos::Int, subseq::LongDNA)
-    # Check if it's a base case of an append!
+function structure_variation!(seq :: LongDNA{4},
+                              pos :: Int,
+                              subseq :: LongDNA)
+    ## Check if it's a base case of an append!
     if pos == lastindex(seq)
         append!(seq, subseq)
         return seq
-    # Check if it's a base case of insert!
+        ## Check if it's a base case of insert!
     elseif pos < lastindex(seq)
         insert!(seq, pos, subseq)
         return seq
-    # Check of an out of bounds insert --> SV
+        ## Check of an out of bounds insert --> SV
     elseif pos > lastindex(seq)
         i = lastindex(seq)
         range = lastindex(seq):pos-1
@@ -83,6 +92,7 @@ function structure_variation!(seq::LongDNA{4}, pos::Int, subseq::LongDNA)
         return seq
     end
 end
+
 
 """
 Apply a copy number variation (CNV).
@@ -101,16 +111,20 @@ Apply a copy number variation (CNV).
     LongDNA{4}("ACGGGGGGT") 
 ```    
 """
-function copy_number_variation!(seq::LongDNA{4}, pos::Int,
-    params::Tuple{LongDNA{4}, Int})
-   subseq, rep = params  # Deconstruct the tuple
-   for i in 1:rep  # Insert subseq `rep` times
-       insert!(seq, pos, subseq)
-   end    
-   return seq
+function copy_number_variation!(seq :: LongDNA{4},
+                                pos :: Int,
+                                params :: Tuple{LongDNA{4}, Int})
+    subseq, rep = params  # Deconstruct the tuple
+    for i in 1:rep  # Insert subseq `rep` times
+        insert!(seq, pos, subseq)
+    end    
+    return seq
 end
 
-#end of deltas
+
+### End of deltas
+
+
 """
 Flattens a JSTree to obtain a sequence.
 
@@ -127,17 +141,18 @@ Flattens a JSTree to obtain a sequence.
     LongDNA{4}("ACGT") 
 ```
 """
-function flatten(tree::JSTree, node_name::String)
-    # Base case: Root sequence
+function flatten(tree :: JSTree, node_name :: String)
+    ## Base case: Root sequence
     if node_name == "root"
         return tree.root
     end
 
-    # Recursive case: Flatten parent and apply deltas
+    ## Recursive case: Flatten parent and apply deltas
     node = tree.children[node_name]
     parent_sequence = flatten(tree, node.parent.name)
     return apply_delta(parent_sequence, node.deltaMap)
 end
+
 
 """
 Prints a visual tree representation.
@@ -158,7 +173,9 @@ Prints a visual tree representation.
        |- child2 
 ```
 """
-function print_tree(tree::JSTree, node_name::String = "root", indent::Int = 0)
+function print_tree(tree :: JSTree,
+                    node_name :: String = "root",
+                    indent :: Int = 0)
     println(" "^(indent * 2) * "|- " * node_name) 
 
     for (child_name, child_node) in tree.children
@@ -169,31 +186,33 @@ function print_tree(tree::JSTree, node_name::String = "root", indent::Int = 0)
     end
 end
 
+
 """
 Prints all JSTree sequences.
 
-# Args: 
+# Args:
    - `tree`: JSTree structure.
 
-# Returns: 
+# Returns:
    - None (prints sequences).
 
-# Examples: 
+# Examples:
 ```julia-repl
     julia> print_sequences(tree) 
     root: ACGT... 
     child1: ACG... 
 ```
 """
-function print_sequences(tree::JSTree)
+function print_sequences(tree :: JSTree)
     println("root: ", tree.root)
     for (name, node) in tree.children
         if name != "root"
-        println("$name: ")
-        println(flatten(tree, node.name))
+            println("$name: ")
+            println(flatten(tree, node.name))
         end
     end
 end
+
 
 """
 Prints sequences from a JournaledString.
@@ -217,24 +236,25 @@ function print_sequences(jst::JournaledString)
     end
 end
 
+
 """
 Builds a string with all sequences.
 
-# Args: 
+# Args:
    - `js`: JournaledString structure.
 
-# Returns: 
+# Returns:
    - Concatenated sequences.
 
-# Examples: 
+# Examples:
 ```julia-repl
     julia> build_sequences(js) 
     "Sequence 1: ACGT...
     Sequence 2: TGCA...
-    ..." 
+    ..."
 ```    
 """
-function build_sequences(js::JournaledString)
+function build_sequences(js :: JournaledString)
     builded = ""
     for i in 1:length(js.deltaMap)
         modified_seq = apply_delta(js.reference, js.deltaMap[i])
@@ -243,23 +263,24 @@ function build_sequences(js::JournaledString)
     return builded
 end
 
+
 """
 Prints all deltas in a JournaledString.
 
-# Args: 
+# Args:
    - `js`: JournaledString structure.
 
-# Returns: 
+# Returns:
    - None (prints deltas).
 
-# Examples: 
+# Examples:
 ```julia-repl
-    julia> print_deltas(js) 
-    " String number 1: 
+    julia> print_deltas(js)
+    " String number 1:
       [time=1] JournalEntry: ... "
 ```
 """
-function print_deltas(js::JournaledString)
+function print_deltas(js :: JournaledString)
     for j in 1:length(js.deltaMap)
         println("String number $j:")
         for (time, entry) in js.deltaMap[j]
@@ -268,63 +289,69 @@ function print_deltas(js::JournaledString)
     end
 end
 
+
 """
 Adds a delta to a JournaledString.
 
-# Args: 
+# Args:
    - `js`: JournaledString structure. 
    - `indices`: Indices to update. 
    - `delta_type`: Type of delta. 
    - `position`: Position for delta. 
    - `data`: Data for the delta.
 
-# Returns: 
+# Returns:
    - None (modifies JournaledString).
 
-# Examples: 
+# Examples:
 ```julia-repl
     julia> add_delta!(js, [1, 2], DeltaTypeIns, 3, "AC") 
 ```    
 """
-function add_delta!(js::JournaledString, indices::Vector{Int}, 
-        delta_type::DeltaType, position::Int, data::Any)
+function add_delta!(js :: JournaledString,
+                    indices :: Vector{Int}, 
+                    delta_type :: DeltaType,
+                    position :: Int,
+                    data :: Any)
     for idx in indices
-        # Create the new JournalEntry
+        ## Create the new JournalEntry
         new_entry = JournalEntry(delta_type, position, data, js.current_time)
 
-        # Insert the entry into the SortedDict with `time` as the key
+        ## Insert the entry into the SortedDict with `time` as the key
         js.deltaMap[idx][js.current_time] = new_entry
 
-        # Increment the current time
+        ## Increment the current time
         js.current_time += 1
     end
 end
 
+
 """
 Adds a JournalEntry to indices.
 
-# Args: 
-   - `js`: JournaledString structure. 
-   - `indices`: Indices to update. 
+# Args:
+   - `js`: JournaledString structure.
+   - `indices`: Indices to update.
    - `entry`: JournalEntry object.
 
-# Returns: 
+# Returns:
    - None (modifies JournaledString).
 
-# Examples: 
+# Examples:
 ```julia-repl
-    julia> add_delta!(js, [1], entry) 
+    julia> add_delta!(js, [1], entry)
 ```
 """
-function add_delta!(js::JournaledString, indices::Vector{Int}, 
-    entry::JournalEntry)
-for idx in indices
-
-    js.deltaMap[idx][js.current_time] = entry
-
-    js.current_time += 1
+function add_delta!(js :: JournaledString,
+                    indices :: Vector{Int}, 
+                    entry :: JournalEntry)
+    for idx in indices
+        js.deltaMap[idx][js.current_time] = entry
+        js.current_time += 1
     end
 end
+
+
 """
 Add a mutation entry (delta) to a node in a Journaled String Tree (JSTree).
 
@@ -340,21 +367,28 @@ Add a mutation entry (delta) to a node in a Journaled String Tree (JSTree).
    - Throws an error if the specified node does not exist in the JSTree.
    - Throws an error if the specified node lacks a delta map.
 """
-function add_delta!(jst::JSTree, node_name::String, delta_type::DeltaType,
-     position::Int, data::Any)
+function add_delta!(jst :: JSTree,
+                    node_name :: String,
+                    delta_type::DeltaType,
+                    position :: Int,
+                    data :: Any)
 
     if node_name == "root"
         error("Cannot add delta to the root node.")
     end
+    
     if !haskey(jst.children, node_name)
         error("Node '$node_name' does not exist.")
     end
+    
     node = jst.children[node_name]
     deltaMap = node.deltaMap
     next_time = isempty(deltaMap) ? 0 : maximum(keys(deltaMap)) + 1
     new_entry = JournalEntry(delta_type, position, data, next_time)
     deltaMap[next_time] = new_entry
 end
+
+
 """
 Add a mutation entry (delta) to a node in a Journaled String Tree (JSTree).
 
@@ -368,21 +402,26 @@ Add a mutation entry (delta) to a node in a Journaled String Tree (JSTree).
    - Throws an error if the specified node does not exist in the JSTree.
    - Throws an error if the specified node lacks a delta map.
 """
-function add_delta!(jst::JSTree, node_name::String, entry::JournalEntry)
+function add_delta!(jst :: JSTree, node_name :: String, entry :: JournalEntry)
 
-   if node_name == "root"
-       error("Cannot add delta to the root node.")
-   end
-   if !haskey(jst.children, node_name)
-       error("Node '$node_name' does not exist.")
-   end
-   node = jst.children[node_name]
-   deltaMap = node.deltaMap
-   next_time = isempty(deltaMap) ? 0 : maximum(keys(deltaMap)) + 1
-   new_entry = JournalEntry(entry.delta_type, entry.position, entry.data,
-   next_time)  
-   deltaMap[next_time] = new_entry
+    if node_name == "root"
+        error("Cannot add delta to the root node.")
+    end
+    
+    if !haskey(jst.children, node_name)
+        error("Node '$node_name' does not exist.")
+    end
+    
+    node = jst.children[node_name]
+    deltaMap = node.deltaMap
+    next_time = isempty(deltaMap) ? 0 : maximum(keys(deltaMap)) + 1
+    new_entry = JournalEntry(entry.delta_type,
+                             entry.position,
+                             entry.data,
+                             next_time)  
+    deltaMap[next_time] = new_entry
 end
+
 
 """
 Removes a delta by time key.
@@ -399,36 +438,38 @@ Removes a delta by time key.
     julia> remove_delta!(js, 5) 
 ```
 """
-function remove_delta!(js::JournaledString, idx::Int, time::Int)
+function remove_delta!(js :: JournaledString, idx :: Int, time :: Int)
     deletioncc = 0
-        for (timer , entry) in js.deltaMap[idx]
-            if timer == time
-                delete!(js.deltaMap[idx], time)
-                deletioncc += 1
-            end
+    for (timer , entry) in js.deltaMap[idx]
+        if timer == time
+            delete!(js.deltaMap[idx], time)
+            deletioncc += 1
         end
+    end
+
     if deletioncc == 0
         error("No mutation found at time: $time at index: $idx" )
     end
 end
 
+
 """
 Removes a delta by time key.
 
-# Args: 
-   - `jst`: JSTree structure. 
+# Args:
+   - `jst`: JSTree structure.
    - `node_name`: Name of the node.
    - `time`: Time key of the delta.
 
-# Returns: 
+# Returns:
    - None (modifies JSTNode).
 
-# Examples: 
+# Examples:
 ```julia-repl
-    julia> remove_delta!(jst, "children1", 5) 
+    julia> remove_delta!(jst, "children1", 5)
 ```
 """
-function remove_delta!(jst::JSTree, node_name::String, time::Int)
+function remove_delta!(jst :: JSTree, node_name :: String, time :: Int)
     deletioncc = 0
     if node_name == "root"
         error("Cannot delete delta of the root node.")
@@ -447,40 +488,47 @@ function remove_delta!(jst::JSTree, node_name::String, time::Int)
         error("No mutation found at time: $time at child: $node_name" )
     end
 end
+
+
 """
 Apply a delta to a sequence.
 
-# Args: 
-   - `reference`: LongDNA{4} reference sequence. 
+# Args:
+   - `reference`: LongDNA{4} reference sequence.
    - `entry`: JournalEntry delta.
 
-# Returns: 
+# Returns:
    - Modified LongDNA{4} sequence.
 
-# Examples: 
+# Examples:
 ```julia-repl
-    julia> apply_delta(ref_seq, entry) 
+    julia> apply_delta(ref_seq, entry)
 ```
 """
-function apply_delta(reference::LongDNA{4}, entry::JournalEntry)
+function apply_delta(reference :: LongDNA{4}, entry :: JournalEntry)
     seq = copy(reference)
-        # Check on the DeltaType
-        if entry.delta_type == DeltaTypeDel
-            seq = delete_at!(seq, entry.position:(entry.position + 
-            entry.data - 1))  # Data is the bound of the range
-        elseif entry.delta_type == DeltaTypeIns
-            seq = insert!(seq, entry.position, LongDNA{4}(entry.data))
-        # Single nucleotide permutation
-        elseif entry.delta_type == DeltaTypeSnp
-            seq[entry.position] = convert(DNA, entry.data)  
-            # Larger Structure change
-        elseif entry.delta_type == DeltaTypeSV
-            seq = structure_variation!(seq, entry.position, entry.data)
-        elseif entry.delta_type == DeltaTypeCNV
-            seq = copy_number_variation!(seq, entry.position, entry.data)
-        end
+
+    ## Check on the DeltaType
+    if entry.delta_type == DeltaTypeDel
+        seq = delete_at!(seq,
+                         entry.position:(entry.position + 
+                             entry.data - 1))  # Data is the bound of the range
+    elseif entry.delta_type == DeltaTypeIns
+        seq = insert!(seq, entry.position, LongDNA{4}(entry.data))
+
+    elseif entry.delta_type == DeltaTypeSnp
+        ## Single nucleotide permutationa
+        seq[entry.position] = convert(DNA, entry.data)  
+
+    elseif entry.delta_type == DeltaTypeSV
+        ## Larger Structure change
+        seq = structure_variation!(seq, entry.position, entry.data)
+    elseif entry.delta_type == DeltaTypeCNV
+        seq = copy_number_variation!(seq, entry.position, entry.data)
+    end
     return seq
 end
+
 
 """
 Apply multiple deltas to a sequence.
@@ -497,21 +545,23 @@ Apply multiple deltas to a sequence.
     julia> apply_delta(ref_seq, delta_map) 
 ```
 """
-function apply_delta(reference::LongDNA{4}, delta::DeltaMap)
+function apply_delta(reference :: LongDNA{4}, delta :: DeltaMap)
 
     seq = copy(reference)
     for (_, entry) in delta 
-        # Check on the DeltaType
+        ## Check on the DeltaType
         if entry.delta_type == DeltaTypeDel
             seq = delete_at!(seq, entry.position:(entry.position + 
             entry.data - 1))  # Data is the bound of the range
         elseif entry.delta_type == DeltaTypeIns
             seq = insert!(seq, entry.position, LongDNA{4}(entry.data))
-        # Single nucleotide permutation
         elseif entry.delta_type == DeltaTypeSnp
+            ## Single nucleotide permutation
+
             seq[entry.position] = convert(DNA, entry.data)  
-            # Larger Structure change
+
         elseif entry.delta_type == DeltaTypeSV
+            ## Larger Structure change
             seq = structure_variation!(seq, entry.position, entry.data)
         elseif entry.delta_type == DeltaTypeCNV
             seq = copy_number_variation!(seq, entry.position, entry.data)
@@ -519,3 +569,6 @@ function apply_delta(reference::LongDNA{4}, delta::DeltaMap)
     end
     return seq
 end
+
+
+### functions.jl ends here.
