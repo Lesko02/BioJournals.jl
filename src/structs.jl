@@ -76,6 +76,11 @@ function JournaledString(reference :: LongDNA{4}, deltaMap :: Vector{DeltaMap})
 end
 
 
+function JournaledString(reference :: LongDNA{4})
+    JournaledString(reference, DeltaMap(10))
+end
+
+
 """
 A node in a Journaled String Tree (JST).
 
@@ -103,11 +108,11 @@ A Journaled String Tree (JST).
    - Initializes with a `root` node named "root".
 """
 struct JSTree
-    root::LongDNA{4}
-    children::Dict{String, JSTNode}
- end
+    root :: LongDNA{4}
+    children :: Dict{String, JSTNode}
+end
 
-function JSTree(root_sequence::LongDNA{4})
+function JSTree(root_sequence :: LongDNA{4})
     root_node = JSTNode(nothing, nothing, "root")
     return JSTree(root_sequence, Dict("root" => root_node))
 end
@@ -147,8 +152,8 @@ end
 Removes a node and all its descendants from a JSTree.
 
 # Arguments
-- `tree::JSTree`: The journaled string tree.
-- `node_name::String`: The name of the node to remove.
+- `tree :: JSTree`: The journaled string tree.
+- `node_name :: String`: The name of the node to remove.
 
 # Errors
 - Throws an error if the node does not exist or if attempting to remove the root.
