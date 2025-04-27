@@ -4,6 +4,27 @@
 
 
 """
+Represents a time stamp tagging a given "change".
+
+The time stamp is a `primitive` type, `Unisigned 64`.
+"""
+primitive type Timestamp <: Unsigned 64 end
+
+Timestamp(x :: UInt8)  = reinterpret(Timestamp, x)
+Timestamp(x :: UInt16) = reinterpret(Timestamp, x)
+Timestamp(x :: UInt32) = reinterpret(Timestamp, x)
+Timestamp(x :: UInt64) = reinterpret(Timestamp, x)
+Timestamp(x :: UInt)   = reinterpret(Timestamp, x)
+
+UInt(ts :: Timestamp) = reinterpret(UInt, ts)
+
+addto(ts :: Timestamp, x :: UInt) = Timestamp(UInt(ts) + x)
+addto(ts :: Timestamp, x :: Timestamp) = Timestamp(UInt(ts) + UInt(x))
+
+Base.show(io :: IO, ts :: Timestamp) = print(io, UInt(ts))
+
+
+"""
 Enumeration of delta types for sequence modifications.
 
 # Values: 
@@ -26,10 +47,11 @@ Represents a single modification in a journaled sequence.
    - `time`: Time key for ordering modifications.
 """
 struct JournalEntry
-    delta_type :: DeltaType    
-    position :: Int64          
+    delta_type :: DeltaType
+    position :: Int64
     data :: Any
-    time :: Int                
+    time :: Int
+    ## time :: Timestamp
 end
 
 
