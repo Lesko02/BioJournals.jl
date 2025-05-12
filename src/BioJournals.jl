@@ -28,6 +28,7 @@ export DeltaType,
     JSTNode,
 
     DeltaMap,
+    Timestamp,
     
     insert!,
     delete_at!,
@@ -63,7 +64,13 @@ export DeltaType,
     load_fasta,
     write_fasta,
     load_fastq,
-    write_fastq
+    write_fastq,
+
+    JSTree2,
+    JSTNode2,
+    add_delta2!,
+    print_tree2,
+    print_position_node
 end
 
 ### BioJournls.jl ends here.
