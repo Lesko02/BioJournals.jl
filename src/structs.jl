@@ -230,4 +230,63 @@ function trim_node(jst :: JSTree, node_name :: String)
     delete!(jst.children, node_name)
 end
 
+
+mutable struct JSTNode2
+    parent   :: Union{Nothing, JSTNode2}
+    deltaMap :: DeltaMap  # SortedDict{Timestamp, JournalEntry}
+    children :: Dict{Int64, JSTNode2}  # Position-based branching
+end
+
+struct JSTree2
+    root :: LongDNA{4}
+    children :: Dict{Int64, JSTNode2}  # Key: Position of the delta
+end
+
+JSTree2(root::LongDNA{4}) = JSTree2(root, Dict{Int64, JSTNode2}())
+
+function add_delta2!(tree::JSTree2, entry::JournalEntry)
+    pos = entry.position
+    current_node = tree.children  # Start at the root
+    path = []
+
+    # Traverse the tree to find the position node
+    while pos in keys(current_node)
+        path_node = current_node[pos]
+        path = [path..., path_node]
+        current_node = path_node.children
+    end
+
+    # Create a new node at the current position
+    parent = isempty(path) ? nothing : last(path)
+    deltaMap = DeltaMap()
+    deltaMap[1] = entry
+    children = Dict{Int64, JSTNode2}()
+    new_node = JSTNode2(parent, deltaMap, children)
+    
+    # Add the new node to the tree
+    current_node[pos] = new_node
+end
+
+function print_tree2(tree::JSTree2)
+    # Start with the root
+    println("|- root")
+    
+    # Iterate over the root's children (positions)
+    for (pos, node) in sort(collect(pairs(tree.children)), by = x -> x.first)
+        print_position_node(pos, node, 1)
+    end
+end
+
+function print_position_node(pos::Int, node::JSTNode2, indent::Int)
+    # Indent string
+    indent_str = "  " * "  "^(indent - 1)
+    
+    # Print the current position node
+    println(indent_str * "|- pos_$pos")
+    
+    # Recursively print children of the current node
+    for (child_pos, child_node) in sort(collect(pairs(node.children)), by = x -> x.first)
+        print_position_node(child_pos, child_node, indent + 1)
+    end
+end
 ### struct.jl ends here.
