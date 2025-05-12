@@ -300,5 +300,31 @@ Sequence 10: AGATCGAGCGAGCTAGCGACTCAG"
     ## end testing new apis
 end
 
+test_entries = [
+    # Deletion: Remove 2 bases starting at position 3
+    JournalEntry(DeltaTypeDel, 3, 2, 1),
+    
+    # Insertion: Add "AC" at position 2
+    JournalEntry(DeltaTypeIns, 2, "AC", 2),
+    
+    # SNP: Change base at position 4 to 'T'
+    JournalEntry(DeltaTypeSnp, 4, DNA_T, 3),
+    
+    # Structural Variation: Add "TT" at position 5
+    JournalEntry(DeltaTypeSV, 5, "TT", 4),
+    
+    # Copy Number Variation: Repeat "GG" 3 times at position 6
+    JournalEntry(DeltaTypeCNV, 6, (LongDNA{4}("GG"), 3), 5),
 
+    JournalEntry(DeltaTypeCNV, 6, (LongDNA{4}("GG"), 3), 5),
+    
+    JournalEntry(DeltaTypeCNV, 6, (LongDNA{4}("GG"), 3), 5)
+]
+tree14 = JSTree2(LongDNA{4}("AGATCGAGCGAGCTAGCGACTCAGCCCCCC"))
+
+for entry in test_entries
+    add_delta2!(tree14, entry)
+end
+
+print_tree2(tree14)
 ### runtests.jl ends here.
