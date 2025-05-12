@@ -23,12 +23,12 @@ end
 
 
 """
-Retrieve mutations within a specific time interval.
+Retrieve mutations within a specific timestamp interval.
 
 # Args: 
    - `delta_map`: The DeltaMap containing mutations. 
-   - `time1`: Start time of the interval. 
-   - `time2`: End time of the interval.
+   - `time1`: Start timestamp of the interval. 
+   - `time2`: End timestamp of the interval.
 
 # Returns: 
    - A string listing mutations within the given range.
@@ -50,11 +50,11 @@ end
 
 
 """
-Get sequences at a specific time in a JournaledString.
+Get sequences at a specific timestamp in a JournaledString.
 
 # Args: 
    - `jst`: The JournaledString to extract sequences from. 
-   - `time`: The time point for reconstruction.
+   - `time`: The timestamp limit for reconstruction.
 
 # Returns: 
    - A vector of LongDNA{4} sequences at the given time.

@@ -70,7 +70,7 @@ end
 Sorted mapping of time keys to journal entries.
 
 # Keys: 
-   - `Integer` time keys. 
+   - `Timestamp` time keys. 
 
 # Values: 
    - Corresponding `JournalEntry` objects.
