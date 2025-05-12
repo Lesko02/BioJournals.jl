@@ -2,10 +2,10 @@
 
 ### runtests.jl
 
-using BioJournals
 using Test
 using BioSequences
 using DataStructures
+using BioJournals
 
 @testset "BioJournals.jl" begin
     reference_seq = LongDNA{4}("AGATCGAGCGAGCTAGCGACTCAG")

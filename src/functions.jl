@@ -284,7 +284,8 @@ function print_deltas(js :: JournaledString)
     for j in 1:length(js.deltaMap)
         println("String number $j:")
         for (time, entry) in js.deltaMap[j]
-            println("  [time=$time] JournalEntry: $entry")
+            time_int = UInt64(time)  # Explicit conversion
+            println("[time = $time_int] JournalEntry: $entry")
         end
     end
 end
@@ -321,7 +322,7 @@ function add_delta!(js :: JournaledString,
         js.deltaMap[idx][js.current_time] = new_entry
 
         ## Increment the current time
-        js.current_time += 1
+        js.current_time += UInt64(1)
     end
 end
 
@@ -347,7 +348,7 @@ function add_delta!(js :: JournaledString,
                     entry :: JournalEntry)
     for idx in indices
         js.deltaMap[idx][js.current_time] = entry
-        js.current_time += 1
+        js.current_time += UInt64(1)
     end
 end
 
@@ -383,7 +384,7 @@ function add_delta!(jst :: JSTree,
     
     node = jst.children[node_name]
     deltaMap = node.deltaMap
-    next_time = isempty(deltaMap) ? 0 : maximum(keys(deltaMap)) + 1
+    next_time = isempty(deltaMap) ? Timestamp(0) : maximum(keys(deltaMap)) + UInt64(1)
     new_entry = JournalEntry(delta_type, position, data, next_time)
     deltaMap[next_time] = new_entry
 end
@@ -414,7 +415,7 @@ function add_delta!(jst :: JSTree, node_name :: String, entry :: JournalEntry)
     
     node = jst.children[node_name]
     deltaMap = node.deltaMap
-    next_time = isempty(deltaMap) ? 0 : maximum(keys(deltaMap)) + 1
+    next_time = isempty(deltaMap) ? Timestamp(0) : maximum(keys(deltaMap)) + UInt64(1)
     new_entry = JournalEntry(entry.delta_type,
                              entry.position,
                              entry.data,
@@ -442,7 +443,7 @@ function remove_delta!(js :: JournaledString, idx :: Int, time :: Int)
     deletioncc = 0
     for (timer , entry) in js.deltaMap[idx]
         if timer == time
-            delete!(js.deltaMap[idx], time)
+            delete!(js.deltaMap[idx], UInt(time))
             deletioncc += 1
         end
     end
@@ -480,7 +481,7 @@ function remove_delta!(jst :: JSTree, node_name :: String, time :: Int)
 
     for (timer , entry) in jst.children[node_name].deltaMap
         if timer == time
-            delete!(jst.children[node_name].deltaMap, time)
+            delete!(jst.children[node_name].deltaMap, UInt(time))
             deletioncc += 1
         end
     end

@@ -15,7 +15,8 @@ Retrieve the full mutation history from a DeltaMap.
 function get_mutation_history(delta_map :: DeltaMap)
     mutation_history = ""
     for (time, entry) in delta_map
-        mutation_history *= "Time $time: $entry\n"
+        time_int = UInt64(time)  # Explicit conversion
+        mutation_history *= "Time $time_int: $entry\n"
     end
     return mutation_history
 end
