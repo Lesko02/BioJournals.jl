@@ -186,7 +186,57 @@ function print_tree(tree :: JSTree,
     end
 end
 
+function print_tree2(tree::JSTree2)
 
+    println("|- root")
+    
+    for (pos, node) in sort(collect(pairs(tree.children)), by = x -> x.first)
+        print_position_node(pos, node, 1)
+    end
+end
+
+function print_position_node(pos::Int, node::JSTNode2, indent::Int)
+
+    indent_str = "  " * "  "^(indent - 1)
+    
+
+    println(indent_str * "|- pos_$pos", collect(keys(node.deltaMap)), 
+                                        collect(values(node.deltaMap))) 
+    # Recursively print children of the current node
+    for (child_pos, child_node) in sort(collect(pairs(node.children)),
+         by = x -> x.first)
+        print_position_node(child_pos, child_node, indent + 1)
+    end
+end
+
+function reconstruct(tree::JSTree2)
+    results = Dict{Int, LongDNA{4}}()
+    results[0] = tree.root
+    counter = 1;
+
+    function explore(node::JSTNode2, current_deltas::DeltaMap)
+
+        for d in node.deltaMap
+            push!(current_deltas, d)
+        end
+
+        if !isempty(node.children)
+            results[counter] = apply_delta(tree.root, current_deltas)
+            counter += 1
+            for (_, child) in node.children
+                explore(child, current_deltas)
+            end
+        end
+    end
+
+    # Parte dai nodi direttamente collegati alla root
+    for (_, node) in tree.children
+        explore(node, DeltaMap())
+    end
+
+    return results
+
+end
 """
 Prints all JSTree sequences.
 
@@ -326,6 +376,28 @@ function add_delta!(js :: JournaledString,
     end
 end
 
+#new experimental for jst2
+function add_delta!(tree :: JSTree2,
+                    indices :: Vector{Int}, 
+                    delta_type :: DeltaType,
+                    position :: Int,
+                    data :: Any)
+    for idx in indices
+        ## Create the new JournalEntry
+        new_entry = JournalEntry(delta_type, position, data, js.current_time)
+
+        ## Insert the entry into the SortedDict with `time` as the key
+        tree.journal[idx][tree.current_time] = new_entry
+
+        ## Increment the current time
+        tree.current_time += UInt64(1)
+
+        push!(tree.collection, new_entry)
+    end
+
+    
+end
+
 
 """
 Adds a JournalEntry to indices.
@@ -453,7 +525,27 @@ function remove_delta!(js :: JournaledString, idx :: Int, time :: Int)
     end
 end
 
+# needs overloading
+function add_delta2!(tree::JSTree2, entry::JournalEntry)
+    pos = entry.position
+    current_node = tree.children
+    path = []
 
+    while pos in keys(current_node)
+        path_node = current_node[pos]
+        path = [path..., path_node]
+        current_node = path_node.children
+    end
+
+    # new node at position
+    parent = isempty(path) ? nothing : last(path)
+    deltaMap = DeltaMap()
+    deltaMap[entry.time] = entry
+    children = Dict{Int64, JSTNode2}()
+    new_node = JSTNode2(parent, deltaMap, children)
+    
+    current_node[pos] = new_node
+end
 """
 Removes a delta by time key.
 
