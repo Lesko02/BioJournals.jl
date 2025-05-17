@@ -305,26 +305,28 @@ test_entries = [
     JournalEntry(DeltaTypeDel, 3, 2, 1),
     
     # Insertion: Add "AC" at position 2
-    JournalEntry(DeltaTypeIns, 2, "AC", 2),
+    JournalEntry(DeltaTypeIns, 2, LongDNA{4}("AC"), 2),
     
     # SNP: Change base at position 4 to 'T'
     JournalEntry(DeltaTypeSnp, 4, DNA_T, 3),
     
     # Structural Variation: Add "TT" at position 5
-    JournalEntry(DeltaTypeSV, 5, "TT", 4),
+    JournalEntry(DeltaTypeSV, 5, LongDNA{4}("TT"), 4),
     
     # Copy Number Variation: Repeat "GG" 3 times at position 6
     JournalEntry(DeltaTypeCNV, 6, (LongDNA{4}("GG"), 3), 5),
 
-    JournalEntry(DeltaTypeCNV, 6, (LongDNA{4}("GG"), 3), 5),
-    
-    JournalEntry(DeltaTypeCNV, 6, (LongDNA{4}("GG"), 3), 5)
+    JournalEntry(DeltaTypeCNV, 6, (LongDNA{4}("TT"), 3), 7),
+
+    JournalEntry(DeltaTypeCNV, 6, (LongDNA{4}("CC"), 3), 8)
 ]
-tree14 = JSTree2(LongDNA{4}("AGATCGAGCGAGCTAGCGACTCAGCCCCCC"))
+tree14 = JSTree2(LongDNA{4}("NNNNNNNNNNNNNN"))
 
 for entry in test_entries
     add_delta2!(tree14, entry)
 end
 
 print_tree2(tree14)
+recoresults = reconstruct(tree14)
+println(recoresults)
 ### runtests.jl ends here.
