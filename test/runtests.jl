@@ -291,7 +291,6 @@ Sequence 10: AGATCGAGCGAGCTAGCGACTCAG"
     add_delta!(tree2, "child1", DeltaTypeSnp, 21, 'C')
     add_delta!(tree2, "child1", entry3)
     @test length(tree2.children["child1"].deltaMap) == 3
-    println(tree2.children["child1"])
     @test_throws ErrorException remove_delta!(tree2, "child1", 3)
     remove_delta!(tree2, "child1", 2)
     @test length(tree2.children["child1"].deltaMap) == 2
@@ -300,33 +299,13 @@ Sequence 10: AGATCGAGCGAGCTAGCGACTCAG"
     ## end testing new apis
 end
 
-test_entries = [
-    # Deletion: Remove 2 bases starting at position 3
-    JournalEntry(DeltaTypeDel, 3, 2, 1),
-    
-    # Insertion: Add "AC" at position 2
-    JournalEntry(DeltaTypeIns, 2, LongDNA{4}("AC"), 2),
-    
-    # SNP: Change base at position 4 to 'T'
-    JournalEntry(DeltaTypeSnp, 4, DNA_T, 3),
-    
-    # Structural Variation: Add "TT" at position 5
-    JournalEntry(DeltaTypeSV, 5, LongDNA{4}("TT"), 4),
-    
-    # Copy Number Variation: Repeat "GG" 3 times at position 6
-    JournalEntry(DeltaTypeCNV, 6, (LongDNA{4}("GG"), 3), 5),
+tree14 = JSTree2(LongDNA{4}("NNNNNNNNNNNNNN"), 10)
+add_delta!(tree14, [1, 2], DeltaTypeIns, 8, "CGTA")
+add_delta!(tree14, [10], DeltaTypeSnp, 21, 'C')
+add_delta!(tree14, [4], DeltaTypeSV, 24, dna"NNNNN")
 
-    JournalEntry(DeltaTypeCNV, 6, (LongDNA{4}("TT"), 3), 7),
 
-    JournalEntry(DeltaTypeCNV, 6, (LongDNA{4}("CC"), 3), 8)
-]
-tree14 = JSTree2(LongDNA{4}("NNNNNNNNNNNNNN"))
-
-for entry in test_entries
-    add_delta2!(tree14, entry)
-end
-
+println(tree14.journal)
 print_tree2(tree14)
-recoresults = reconstruct(tree14)
-println(recoresults)
+
 ### runtests.jl ends here.
