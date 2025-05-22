@@ -382,17 +382,20 @@ function add_delta!(tree :: JSTree2,
                     delta_type :: DeltaType,
                     position :: Int,
                     data :: Any)
+
     for idx in indices
         ## Create the new JournalEntry
-        new_entry = JournalEntry(delta_type, position, data, js.current_time)
+        new_entry = JournalEntry(delta_type, position, data, tree.current_time)
 
-        ## Insert the entry into the SortedDict with `time` as the key
-        tree.journal[idx][tree.current_time] = new_entry
 
+        entries = get!(tree.journal, Int64(position)) do
+        fill(nothing, tree.length)
+        end
+
+        entries[idx] = new_entry
         ## Increment the current time
         tree.current_time += UInt64(1)
 
-        push!(tree.collection, new_entry)
     end
 
     
