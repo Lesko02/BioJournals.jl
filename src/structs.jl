@@ -39,7 +39,6 @@ Base.show(io::IO, ts::Timestamp) = show(io, UInt64(ts))
 Base.print(io::IO, ts::Timestamp) = print(io, repr(UInt64(ts)))
 
 
-Base.isless(a::JournalEntry, b::JournalEntry) = a.position < b.position
 """
 Enumeration of delta types for sequence modifications.
 
@@ -67,6 +66,8 @@ struct JournalEntry
     data :: Any
     time :: Timestamp
 end
+
+Base.isless(a::JournalEntry, b::JournalEntry) = a.position < b.position
 
 
 """
@@ -236,20 +237,27 @@ end
 
 mutable struct JSTNode2
     parent   :: Union{Nothing, JSTNode2}
-    deltaMap :: DeltaMap
+    delta :: Dict{Int64, JournalEntry}
     children :: Dict{Int64, JSTNode2}
 end
 
-struct JSTree2
+mutable struct JSTree2
     root :: LongDNA{4}
     children :: Dict{Int64, JSTNode2}
-    collection :: SortedSet{JournalEntry}
-    journal :: Vector{DeltaMap}
+    journal :: SortedDict{Int64, Vector{Union{Nothing, JournalEntry}}}
     current_time :: Timestamp
+    length :: Int
 end
 
-JSTree2(root::LongDNA{4}, length :: Int) = JSTree2(root, Dict{Int64, JSTNode2}(),
-                            SortedSet{JournalEntry}(), DeltaMap(length), 0)
-
+function JSTree2(root::LongDNA{4}, default_length::Int)
+    journal = SortedDict{Int64, Vector{Union{Nothing, JournalEntry}}}()
+    return JSTree2(
+        root,
+        Dict{Int64, JSTNode2}(),
+        journal,
+        0,
+        default_length
+    )
+end
 
 ### struct.jl ends here.
