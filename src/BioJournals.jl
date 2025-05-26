@@ -71,8 +71,8 @@ export DeltaType,
     add_delta2!,
     print_tree2,
     print_position_node,
-    reconstruct,
-    dfs
+    build_tree!
+    
 end
 
 ### BioJournls.jl ends here.
