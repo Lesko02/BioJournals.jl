@@ -71,7 +71,9 @@ export DeltaType,
     add_delta2!,
     print_tree2,
     print_position_node,
-    build_tree!
+    build_tree!,
+    print_tree2,
+    _print_node
     
 end
 
