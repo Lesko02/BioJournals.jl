@@ -186,57 +186,6 @@ function print_tree(tree :: JSTree,
     end
 end
 
-function print_tree2(tree::JSTree2)
-
-    println("|- root")
-    
-    for (pos, node) in sort(collect(pairs(tree.children)), by = x -> x.first)
-        print_position_node(pos, node, 1)
-    end
-end
-
-function print_position_node(pos::Int, node::JSTNode2, indent::Int)
-
-    indent_str = "  " * "  "^(indent - 1)
-    
-
-    println(indent_str * "|- pos_$pos", collect(keys(node.deltaMap)), 
-                                        collect(values(node.deltaMap))) 
-    # Recursively print children of the current node
-    for (child_pos, child_node) in sort(collect(pairs(node.children)),
-         by = x -> x.first)
-        print_position_node(child_pos, child_node, indent + 1)
-    end
-end
-
-function reconstruct(tree::JSTree2)
-    results = Dict{Int, LongDNA{4}}()
-    results[0] = tree.root
-    counter = 1;
-
-    function explore(node::JSTNode2, current_deltas::DeltaMap)
-
-        for d in node.deltaMap
-            push!(current_deltas, d)
-        end
-
-        if !isempty(node.children)
-            results[counter] = apply_delta(tree.root, current_deltas)
-            counter += 1
-            for (_, child) in node.children
-                explore(child, current_deltas)
-            end
-        end
-    end
-
-    # Parte dai nodi direttamente collegati alla root
-    for (_, node) in tree.children
-        explore(node, DeltaMap())
-    end
-
-    return results
-
-end
 """
 Prints all JSTree sequences.
 
@@ -384,16 +333,35 @@ function add_delta!(tree :: JSTree2,
                     data :: Any)
 
     for idx in indices
-        ## Create the new JournalEntry
+        # Create the new JournalEntry
         new_entry = JournalEntry(delta_type, position, data, tree.current_time)
 
-
-        entries = get!(tree.journal, Int64(position)) do
-        fill(nothing, tree.length)
+        # Get or build bucket
+        vec = get!(tree.journal, Int64(position)) do
+            Vector{Dict{Int64,JournalEntry}}()
         end
 
-        entries[idx] = new_entry
-        ## Increment the current time
+        # Search bucket
+        bucket = nothing
+        for d in vec
+            first_e = first(values(d))
+            if first_e.delta_type == delta_type &&
+               first_e.data === data
+                bucket = d
+                break
+            end
+        end
+
+        # if none found, make a new bucket
+        if bucket === nothing
+            bucket = Dict{Int64,JournalEntry}()
+            push!(vec, bucket)
+        end
+
+        # Push entry
+        bucket[Int64(idx)] = new_entry
+
+        # Update clock
         tree.current_time += UInt64(1)
 
     end
@@ -401,6 +369,39 @@ function add_delta!(tree :: JSTree2,
     
 end
 
+function build_tree!(tree::JSTree2)
+    tree.rootChildren = JSTNode2[]             # clear any prior structure
+    lastPrimary = nothing                       # tracks the main chain
+
+    for (pos, buckets) in tree.journal
+        if isempty(buckets)
+            continue
+        end
+
+        # first bucket = primary chain node
+        b0 = buckets[1]
+        node0 = JSTNode2(nothing, copy(b0), JSTNode2[])
+        if lastPrimary === nothing
+            push!(tree.rootChildren, node0)
+        else
+            node0.parent = lastPrimary
+            push!(lastPrimary.children, node0)
+        end
+        lastPrimary = node0
+
+        # any other buckets at same pos = secondary branches
+        for b in buckets[2:end]
+            node = JSTNode2(nothing, copy(b), JSTNode2[])
+            parentNode = node0.parent
+            node.parent = parentNode
+            if parentNode === nothing
+                push!(tree.rootChildren, node)
+            else
+                push!(parentNode.children, node)
+            end
+        end
+    end
+end
 
 """
 Adds a JournalEntry to indices.
