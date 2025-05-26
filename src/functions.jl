@@ -186,6 +186,29 @@ function print_tree(tree :: JSTree,
     end
 end
 
+function _print_node(node::JSTNode2, indent::Int)
+    # build a label from its delta dict
+    first_e  = first(values(node.delta))
+    pos      = first_e.position
+    idxs     = collect(keys(node.delta))
+    dtype    = first_e.delta_type
+    label    = "pos=$pos idxs=$(idxs) type=$(dtype)"
+
+    # print with the right indent
+    println(" "^ (2*indent) * "|- " * label)
+
+    # recurse into children
+    for child in node.children
+        _print_node(child, indent+1)
+    end
+end
+
+# top-level: print each root child
+function print_tree2(tree::JSTree2)
+    for node in tree.rootChildren
+        _print_node(node, 0)
+    end
+end
 """
 Prints all JSTree sequences.
 
