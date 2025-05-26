@@ -281,5 +281,94 @@ function exact_search(jst :: JSTree, needle :: LongDNA{4})
     return indexMatrix
 end
 
+"""
+Perform exact search in a Journaled String Tree 2(JST).
 
+# Args: 
+   - `jst`: The JSTree2 to search in. 
+   - `needle`: The LongDNA{4} sequence to find.
+
+# Returns: 
+   - A dictionary mapping node names to exact match ranges.
+"""
+function exact_search(tree::JSTree2, needle::LongDNA{4})
+    # prepare a dict of result‐vectors for each sequence index
+    results = Dict(i => UnitRange{Int64}[] for i in 1:tree.length)
+    # build the exact‐search query once
+    query = ExactSearchQuery(needle)
+
+    # for each “leaf” sequence index...
+    for i in 1:tree.length
+        # start from the root sequence
+        seq = copy(tree.root)
+
+        # apply every delta in ascending position order
+        for (pos, buckets) in tree.journal
+            for bucket in buckets
+                # if this bucket has a mutation for index i, apply it
+                if haskey(bucket, Int64(i))
+                    entry = bucket[Int64(i)]
+                    seq = apply_delta(seq, entry)
+                end
+            end
+        end
+
+        # now search the fully reconstructed seq for exact matches
+        matches = BioSequences.findall(query, seq)
+        append!(results[i], matches)
+    end
+
+    return results
+end
+
+function approximate_search(tree::JSTree2, needle::LongDNA{4})
+    tol         = ceil(Int, length(needle) * 0.05)
+    query       = ApproximateSearchQuery(needle)
+
+    # initial root matches
+    root_hits   = approximate_findall(query, tol, tree.root)
+    results     = Dict(i => copy(root_hits) for i in 1:tree.length)
+    results_set = Dict(i => Set(root_hits)  for i in 1:tree.length)
+
+    for i in 1:tree.length
+        applied = false
+        seq     = nothing
+
+        for (_pos, buckets) in tree.journal
+            for bucket in buckets
+                if haskey(bucket, Int64(i))
+                    entry      = bucket[Int64(i)]
+                    # find which current hits this entry invalidates
+                    hit_ranges = collect(results_set[i])
+                    invalid    = [r for r in hit_ranges if entry.position in r]
+
+                    # only if there are invalidated root‐hits do we proceed
+                    if !isempty(invalid)
+                        if !applied
+                            seq              = copy(tree.root)
+                            results_set[i]   = Set()   # drop all old hits
+                            applied          = true
+                        end
+
+                        # remove just the invalidated ranges
+                        for r in invalid
+                            delete!(results_set[i], r)
+                        end
+
+                        # apply mutation and add new approximate hits
+                        seq = apply_delta(seq, entry)
+                        for newr in approximate_findall(query, tol, seq)
+                            push!(results_set[i], newr)
+                        end
+                    end
+                end
+            end
+        end
+
+        # finalize
+        results[i] = collect(results_set[i])
+    end
+
+    return results
+end
 ### algorithms.jl ends here.
