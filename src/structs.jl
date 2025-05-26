@@ -237,24 +237,24 @@ end
 
 mutable struct JSTNode2
     parent   :: Union{Nothing, JSTNode2}
-    delta :: Dict{Int64, JournalEntry}
-    children :: Dict{Int64, JSTNode2}
+    delta    :: Dict{Int64, JournalEntry}
+    children :: Vector{JSTNode2}
 end
 
 mutable struct JSTree2
-    root :: LongDNA{4}
-    children :: Dict{Int64, JSTNode2}
-    journal :: SortedDict{Int64, Vector{Union{Nothing, JournalEntry}}}
+    root         :: LongDNA{4}
+    rootChildren :: Vector{JSTNode2}
+    journal      :: SortedDict{Int64, Vector{Dict{Int64, JournalEntry}}}
     current_time :: Timestamp
-    length :: Int
+    length       :: Int
 end
 
 function JSTree2(root::LongDNA{4}, default_length::Int)
-    journal = SortedDict{Int64, Vector{Union{Nothing, JournalEntry}}}()
+    journal = SortedDict{Int64, Dict{Int64, JournalEntry}}()
     return JSTree2(
         root,
-        Dict{Int64, JSTNode2}(),
-        journal,
+        JSTNode2[],
+        SortedDict{Int64, Vector{Dict{Int64,JournalEntry}}}(),
         0,
         default_length
     )
