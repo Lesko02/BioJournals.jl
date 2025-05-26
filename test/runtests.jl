@@ -306,6 +306,6 @@ add_delta!(tree14, [4], DeltaTypeSV, 24, dna"NNNNN")
 
 
 println(tree14.journal)
-print_tree2(tree14)
-
+build_tree!(tree14)
+println(tree14)
 ### runtests.jl ends here.
