@@ -301,11 +301,12 @@ end
 
 tree14 = JSTree2(LongDNA{4}("NNNNNNNNNNNNNN"), 10)
 add_delta!(tree14, [1, 2], DeltaTypeIns, 8, "CGTA")
+add_delta!(tree14, [3, 4], DeltaTypeIns, 8, "CGTA")
 add_delta!(tree14, [10], DeltaTypeSnp, 21, 'C')
 add_delta!(tree14, [4], DeltaTypeSV, 24, dna"NNNNN")
 
 
 println(tree14.journal)
 build_tree!(tree14)
-println(tree14)
+print_tree2(tree14)
 ### runtests.jl ends here.
