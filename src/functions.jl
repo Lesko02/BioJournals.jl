@@ -617,20 +617,80 @@ Removes a delta entry from a JSTree2 by time key.
     julia> remove_delta!(jst, 5) 
 ```
 """
-function remove_delta!(tree::JSTree2, time::Int)
-    # Walk through each bucket of deltas in the journal
-    for (pos, bucket) in tree.journal
-        for (idx, delta) in bucket
-            if delta.time == time
-                delete!(bucket, idx)
-                isempty(bucket) && delete!(tree.journal, pos)
-                return nothing
+
+"""
+remove_delta!(tree::JSTree2, time::Int)
+
+Remove the JournalEntry whose timestamp is `time` from a JSTree2’s journal.
+
+Arguments:
+- tree::JSTree2   : the JSTree2 containing the journal
+- time::Int       : the unique timestamp key of the entry to remove
+
+Returns:
+- nothing         : modifies `tree` in place
+
+Throws:
+- ErrorException  : if no entry with the given `time` exists
+"""
+
+function remove_delta!(tree::JSTree2, time::Timestamp)
+    found = false
+    pos_to_clean = nothing
+    bucket_idx_to_clean = nothing
+    
+    # Search through all journal entries
+    for (pos, buckets) in tree.journal
+        for (bucket_idx, bucket) in enumerate(buckets)
+            for (idx, entry) in bucket
+                if entry.time == time
+                    # Found target entry - remove from bucket
+                    delete!(bucket, idx)
+                    found = true
+                    pos_to_clean = pos
+                    bucket_idx_to_clean = bucket_idx
+                    break
+                end
+            end
+            found && break
+        end
+        found && break
+    end
+
+    if !found
+        error("No mutation found at time: $time")
+    end
+
+    # Clean up empty structures
+    if !isnothing(pos_to_clean)
+        bucket = tree.journal[pos_to_clean][bucket_idx_to_clean]
+        
+        # Remove bucket if empty
+        if isempty(bucket)
+            deleteat!(tree.journal[pos_to_clean], bucket_idx_to_clean)
+            
+            # Remove position entry if no buckets left
+            if isempty(tree.journal[pos_to_clean])
+                delete!(tree.journal, pos_to_clean)
             end
         end
     end
 
-    # If we get here, no delta had that time
-    error("No delta found for time=$time in JSTree2 journal")
+end
+
+remove_delta!(tree::JSTree2, time::Integer) = remove_delta!(tree, Timestamp(time))
+
+"""
+Count total deltas in journal (for testing)
+"""
+function delta_count(tree::JSTree2)
+    count = 0
+    for (_, buckets) in tree.journal
+        for bucket in buckets
+            count += length(bucket)
+        end
+    end
+    return count
 end
 
 """
