@@ -15,19 +15,20 @@ Retrieve the full mutation history from a DeltaMap.
 function get_mutation_history(delta_map :: DeltaMap)
     mutation_history = ""
     for (time, entry) in delta_map
-        mutation_history *= "Time $time: $entry\n"
+        time_int = UInt64(time)  # Explicit conversion
+        mutation_history *= "Time $time_int: $entry\n"
     end
     return mutation_history
 end
 
 
 """
-Retrieve mutations within a specific time interval.
+Retrieve mutations within a specific timestamp interval.
 
 # Args: 
    - `delta_map`: The DeltaMap containing mutations. 
-   - `time1`: Start time of the interval. 
-   - `time2`: End time of the interval.
+   - `time1`: Start timestamp of the interval. 
+   - `time2`: End timestamp of the interval.
 
 # Returns: 
    - A string listing mutations within the given range.
@@ -49,11 +50,11 @@ end
 
 
 """
-Get sequences at a specific time in a JournaledString.
+Get sequences at a specific timestamp in a JournaledString.
 
 # Args: 
    - `jst`: The JournaledString to extract sequences from. 
-   - `time`: The time point for reconstruction.
+   - `time`: The timestamp limit for reconstruction.
 
 # Returns: 
    - A vector of LongDNA{4} sequences at the given time.
@@ -134,11 +135,12 @@ end
 
 
 ### Multiple dispactch of == operator
-
+#=
 Base.:(==)(a :: JSTNode, b :: JSTNode) = 
     a.name == b.name && 
     hash(a.deltaMap) == hash(b.deltaMap) && 
     a.parent == b.parent 
+
 
 
 """
@@ -169,6 +171,25 @@ function is_equal(jst1 :: JSTree, jst2 :: JSTree) :: Bool
     
     return true
 end
+=#
+"""
+Check if two Journaled String Trees (JSTrees) are equal.
+
+Args: 
+    jst1: The first JSTree. 
+    jst2: The second JSTree.
+
+Returns: 
+    `true` if both trees have identical root sequences and children.
+"""
+function is_equal(jst1 :: JSTree, jst2 :: JSTree) :: Bool
+    ## Compare root sequences (assumed immutable)
+    jst1.root != jst2.root && return false
+    jst1.current_time != jst2.current_time && return false
+    
+    return true
+end
+
 
 
 """

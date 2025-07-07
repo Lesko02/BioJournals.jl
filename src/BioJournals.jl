@@ -28,13 +28,13 @@ export DeltaType,
     JSTNode,
 
     DeltaMap,
+    Timestamp,
     
     insert!,
     delete_at!,
     structure_variation!,
     copy_number_variation!,
     
-    flatten,
     print_tree,
     print_sequences,
     build_sequences,
@@ -43,8 +43,6 @@ export DeltaType,
     add_delta!,
     remove_delta!,
     apply_delta,
-    add_node,
-    remove_node!,
     
     approximate_findall,
     approximate_search,
@@ -58,15 +56,18 @@ export DeltaType,
     remove_mutation!,
     is_equal,
     print_results,
-    trim_node,
-    
+
     load_fasta,
     write_fasta,
     load_fastq,
-    write_fastq
+    write_fastq,
+
+    print_position_node,
+    build_tree!,
+    print_tree2,
+    _print_node,
+    delta_count
+    
 end
 
 ### BioJournls.jl ends here.
-
-
-
