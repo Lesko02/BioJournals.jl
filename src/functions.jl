@@ -124,36 +124,6 @@ end
 
 ### End of deltas
 
-
-"""
-Flattens a JSTree to obtain a sequence.
-
-# Args: 
-   - `tree`: JSTree structure. 
-   - `node_name`: Node to flatten.
-
-# Returns: 
-   - Flattened sequence.
-
-# Examples: 
-```julia-repl
-    julia> flatten(tree, "child_node") 
-    LongDNA{4}("ACGT") 
-```
-"""
-function flatten(tree :: JSTree, node_name :: String)
-    ## Base case: Root sequence
-    if node_name == "root"
-        return tree.root
-    end
-
-    ## Recursive case: Flatten parent and apply deltas
-    node = tree.children[node_name]
-    parent_sequence = flatten(tree, node.parent.name)
-    return apply_delta(parent_sequence, node.deltaMap)
-end
-
-
 """
 Prints a visual tree representation.
 
@@ -169,24 +139,11 @@ Prints a visual tree representation.
 ```julai-repl
     julia> print_tree(tree) 
     |- root
-       |- child1
-       |- child2 
+       |- pos, deltatype, index
+       |- pos, deltatype, index
 ```
 """
-function print_tree(tree :: JSTree,
-                    node_name :: String = "root",
-                    indent :: Int = 0)
-    println(" "^(indent * 2) * "|- " * node_name) 
-
-    for (child_name, child_node) in tree.children
-        
-        if child_node.parent !== nothing && child_node.parent.name == node_name
-            print_tree(tree, child_name, indent + 1) 
-        end
-    end
-end
-
-function _print_node(node::JSTNode2, indent::Int)
+function _print_node(node::JSTNode, indent::Int)
     # build a label from its delta dict
     first_e  = first(values(node.delta))
     pos      = first_e.position
@@ -204,37 +161,11 @@ function _print_node(node::JSTNode2, indent::Int)
 end
 
 # top-level: print each root child
-function print_tree2(tree::JSTree2)
+function print_tree(tree::JSTree)
     for node in tree.rootChildren
         _print_node(node, 0)
     end
 end
-"""
-Prints all JSTree sequences.
-
-# Args:
-   - `tree`: JSTree structure.
-
-# Returns:
-   - None (prints sequences).
-
-# Examples:
-```julia-repl
-    julia> print_sequences(tree) 
-    root: ACGT... 
-    child1: ACG... 
-```
-"""
-function print_sequences(tree :: JSTree)
-    println("root: ", tree.root)
-    for (name, node) in tree.children
-        if name != "root"
-            println("$name: ")
-            println(flatten(tree, node.name))
-        end
-    end
-end
-
 
 """
 Prints sequences from a JournaledString.
@@ -349,8 +280,24 @@ function add_delta!(js :: JournaledString,
 end
 
 """
+Adds a delta to a JournaledString.
+
+# Args:
+   - `js`: JournaledString structure. 
+   - `indices`: Indices to update. 
+   - `delta_type`: Type of delta. 
+   - `position`: Position for delta. 
+   - `data`: Data for the delta.
+
+# Returns:
+   - None (modifies JournaledString).
+
+# Examples:
+```julia-repl
+    julia> add_delta!(js, [1, 2], DeltaTypeIns, 3, "AC") 
+```    
 """
-function add_delta!(tree :: JSTree2,
+function add_delta!(tree :: JSTree,
                     indices :: Vector{Int}, 
                     delta_type :: DeltaType,
                     position :: Int,
@@ -394,19 +341,19 @@ function add_delta!(tree :: JSTree2,
 end
 
 """
-Insert a JournalEntry template into a JSTree2, stamping each insertion
-with the tree’s current_time (and then incrementing it).
+Insert a JournalEntry template into a JSTree, stamping each insertion
+with the tree's current_time (and then incrementing it).
 
 # Args
-- `tree`     : the JSTree2 to modify
-- `indices`  : Vector of sequence‐indices where this entry applies
+- `tree`     : the JSTree to modify
+- `indices`  : Vector of sequence indices where this entry applies
 - `entry`    : a JournalEntry whose `delta_type`, `position`, and `data`
-               we’ll reuse (its `.time` is ignored)
+               we'll reuse (its `.time` is ignored)
 
 # Returns
 - `nothing`  : mutates `tree.journal` and `tree.current_time`
 """
-function add_delta!(tree::JSTree2, indices::Vector{Int}, entry::JournalEntry)
+function add_delta!(tree::JSTree, indices::Vector{Int}, entry::JournalEntry)
     pos = Int64(entry.position)
 
     # grab or initialize the list of same‐kind buckets at this position
@@ -440,8 +387,8 @@ function add_delta!(tree::JSTree2, indices::Vector{Int}, entry::JournalEntry)
     return nothing
 end
 
-function build_tree!(tree::JSTree2)
-    tree.rootChildren = JSTNode2[]             # clear any prior structure
+function build_tree!(tree::JSTree)
+    tree.rootChildren = JSTNode[]             # clear any prior structure
     lastPrimary = nothing                       # tracks the main chain
 
     for (pos, buckets) in tree.journal
@@ -451,7 +398,7 @@ function build_tree!(tree::JSTree2)
 
         # first bucket = primary chain node
         b0 = buckets[1]
-        node0 = JSTNode2(nothing, copy(b0), JSTNode2[])
+        node0 = JSTNode(nothing, copy(b0), JSTNode[])
         if lastPrimary === nothing
             push!(tree.rootChildren, node0)
         else
@@ -462,7 +409,7 @@ function build_tree!(tree::JSTree2)
 
         # any other buckets at same pos = secondary branches
         for b in buckets[2:end]
-            node = JSTNode2(nothing, copy(b), JSTNode2[])
+            node = JSTNode(nothing, copy(b), JSTNode[])
             parentNode = node0.parent
             node.parent = parentNode
             if parentNode === nothing
@@ -501,77 +448,6 @@ end
 
 
 """
-Add a mutation entry (delta) to a node in a Journaled String Tree (JSTree).
-
-# Args:
-   - `jst`: The JSTree to modify.
-   - `node_name`: The name of the node to which the delta is added.
-   - `delta_type`: The type of mutation (e.g., insertion, deletion).
-   - `position`: The position in the sequence where the mutation occurs.
-   - `data`: The data associated with the mutation.
-
-# Errors:
-   - Throws an error if attempting to add a delta to the root node.
-   - Throws an error if the specified node does not exist in the JSTree.
-   - Throws an error if the specified node lacks a delta map.
-"""
-function add_delta!(jst :: JSTree,
-                    node_name :: String,
-                    delta_type::DeltaType,
-                    position :: Int,
-                    data :: Any)
-
-    if node_name == "root"
-        error("Cannot add delta to the root node.")
-    end
-    
-    if !haskey(jst.children, node_name)
-        error("Node '$node_name' does not exist.")
-    end
-    
-    node = jst.children[node_name]
-    deltaMap = node.deltaMap
-    next_time = isempty(deltaMap) ? Timestamp(0) : maximum(keys(deltaMap)) + UInt64(1)
-    new_entry = JournalEntry(delta_type, position, data, next_time)
-    deltaMap[next_time] = new_entry
-end
-
-
-"""
-Add a mutation entry (delta) to a node in a Journaled String Tree (JSTree).
-
-# Args:
-   - `jst`: The JSTree to modify.
-   - `node_name`: The name of the node to which the delta is added.
-   - `entry`: The JournalEntry to add.
-
-# Errors:
-   - Throws an error if attempting to add a delta to the root node.
-   - Throws an error if the specified node does not exist in the JSTree.
-   - Throws an error if the specified node lacks a delta map.
-"""
-function add_delta!(jst :: JSTree, node_name :: String, entry :: JournalEntry)
-
-    if node_name == "root"
-        error("Cannot add delta to the root node.")
-    end
-    
-    if !haskey(jst.children, node_name)
-        error("Node '$node_name' does not exist.")
-    end
-    
-    node = jst.children[node_name]
-    deltaMap = node.deltaMap
-    next_time = isempty(deltaMap) ? Timestamp(0) : maximum(keys(deltaMap)) + UInt64(1)
-    new_entry = JournalEntry(entry.delta_type,
-                             entry.position,
-                             entry.data,
-                             next_time)  
-    deltaMap[next_time] = new_entry
-end
-
-
-"""
 Removes a delta by time key.
 
 # Args: 
@@ -601,14 +477,14 @@ function remove_delta!(js :: JournaledString, idx :: Int, time :: Int)
 end
 
 """
-Removes a delta entry from a JSTree2 by time key.
+Removes a delta entry from a JSTree by time key.
 
 # Args:
-   - `tree`: The JSTree2 structure.
+   - `tree`: The JSTree structure.
    - `time`: Time key of the delta entry to remove.
 
 # Returns:
-   - `nothing` (modifies JSTree2 in place)
+   - `nothing` (modifies JSTree in place)
 
 # Throws:
    - `ErrorException` if no matching delta is found.
@@ -619,22 +495,22 @@ Removes a delta entry from a JSTree2 by time key.
 """
 
 """
-remove_delta!(tree::JSTree2, time::Int)
+remove_delta!(tree::JSTree, time::Int)
 
-Remove the JournalEntry whose timestamp is `time` from a JSTree2’s journal.
+Remove the JournalEntry whose timestamp is `time` from a JSTree's journal.
 
-Arguments:
-- tree::JSTree2   : the JSTree2 containing the journal
-- time::Int       : the unique timestamp key of the entry to remove
+# Arguments:
+    - tree::JSTree   : the JSTree containing the journal
+    - time::Int       : the unique timestamp key of the entry to remove
 
-Returns:
-- nothing         : modifies `tree` in place
+# Returns:
+    - nothing         : modifies `tree` in place
 
-Throws:
-- ErrorException  : if no entry with the given `time` exists
+#Throws:
+    - ErrorException  : if no entry with the given `time` exists
 """
 
-function remove_delta!(tree::JSTree2, time::Timestamp)
+function remove_delta!(tree::JSTree, time::Timestamp)
     found = false
     pos_to_clean = nothing
     bucket_idx_to_clean = nothing
@@ -678,12 +554,12 @@ function remove_delta!(tree::JSTree2, time::Timestamp)
 
 end
 
-remove_delta!(tree::JSTree2, time::Integer) = remove_delta!(tree, Timestamp(time))
+remove_delta!(tree::JSTree, time::Integer) = remove_delta!(tree, Timestamp(time))
 
 """
 Count total deltas in journal (for testing)
 """
-function delta_count(tree::JSTree2)
+function delta_count(tree::JSTree)
     count = 0
     for (_, buckets) in tree.journal
         for bucket in buckets
@@ -691,42 +567,6 @@ function delta_count(tree::JSTree2)
         end
     end
     return count
-end
-
-"""
-Removes a delta by time key.
-
-# Args:
-   - `jst`: JSTree structure.
-   - `node_name`: Name of the node.
-   - `time`: Time key of the delta.
-
-# Returns:
-   - None (modifies JSTNode).
-
-# Examples:
-```julia-repl
-    julia> remove_delta!(jst, "children1", 5)
-```
-"""
-function remove_delta!(jst :: JSTree, node_name :: String, time :: Int)
-    deletioncc = 0
-    if node_name == "root"
-        error("Cannot delete delta of the root node.")
-    end
-    if !haskey(jst.children, node_name)
-        error("Node '$node_name' does not exist.")
-    end
-
-    for (timer , entry) in jst.children[node_name].deltaMap
-        if timer == time
-            delete!(jst.children[node_name].deltaMap, UInt(time))
-            deletioncc += 1
-        end
-    end
-    if deletioncc == 0
-        error("No mutation found at time: $time at child: $node_name" )
-    end
 end
 
 
