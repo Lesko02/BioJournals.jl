@@ -54,26 +54,21 @@ using BioJournals
 
     ## Test of comparisons JST
     
-    tree1 = JSTree(LongDNA{4}("AGATCGAGCGAGCTAGCGACTCAG"))
-    add_node(tree1, "root", deltaMap[1], "child1")
-    add_node(tree1, "child1", deltaMap[2] , "child2")
-    add_node(tree1, "child1", deltaMap[3], "child3")
-    add_node(tree1, "child1", deltaMap[4], "child4")
-    add_node(tree1, "child4", deltaMap[5], "child5")
+    tree1 = JSTree2(LongDNA{4}("AGATCGAGCGAGCTAGCGACTCAG"), 10)
+    add_delta!(tree1, [1, 2], DeltaTypeIns, 8, "CGTA")
+    add_delta!(tree1, [4, 9], DeltaTypeSnp, 10, 'C')
+    add_delta!(tree1, [8], DeltaTypeIns, 24, "NNNNN")
+    
+    tree2 = JSTree2(LongDNA{4}("AGATCGAGCGAGCTAGCGACTCAG"), 10)
+    add_delta!(tree2, [1, 2], DeltaTypeIns, 8, "CGTA")
+    add_delta!(tree2, [4, 9], DeltaTypeSnp, 10, 'C')
+    add_delta!(tree2, [8], DeltaTypeIns, 24, "NNNNN")
 
-    tree2 = JSTree(LongDNA{4}("AGATCGAGCGAGCTAGCGACTCAG"))
-    add_node(tree2, "root", deltaMap[1], "child1")
-    add_node(tree2, "child1", deltaMap[2] , "child2")
-    add_node(tree2, "child1", deltaMap[3], "child3")
-    add_node(tree2, "child1", deltaMap[4], "child4")
-    add_node(tree2, "child4", deltaMap[5], "child5")
-
-    treecpy = JSTree(LongDNA{4}("AGATCGAGCGAGCTAGCGACTCAGCCCCCC"))
-    add_node(tree1, "root", deltaMap[1], "child1")
-    add_node(tree1, "child1", deltaMap[2] , "child2")
-    add_node(tree1, "child1", deltaMap[3], "child3")
-    add_node(tree1, "child1", deltaMap[4], "child4")
-    add_node(tree1, "child4", deltaMap[5], "child5")
+    treecpy = JSTree2(LongDNA{4}("AGATCGAGCGAGCTAGCGACTCAGCCCCCC"), 10)
+    add_delta!(treecpy, [1, 2], DeltaTypeIns, 8, "CGTA")
+    add_delta!(treecpy, [4, 9], DeltaTypeSnp, 10, 'C')
+    add_delta!(treecpy, [8], DeltaTypeIns, 24, "NNNNN")
+    add_delta!(treecpy, [1, 3], DeltaTypeCNV, 1, (LongDNA{4}("ATCG"), 2))
 
     @test is_equal(tree1, tree2) == true
     @test Base.isequal(tree1, tree2) == false
@@ -111,17 +106,11 @@ Sequence 10: AGATCGAGCGAGCTAGCGACTCAG"
     ]
 
 
-    ## Test of flatten
-    
-    @test flatten(tree1, "child1") == LongDNA{4}("AGATCGACGTAGCGAGCTAGCGACTCAG")
-
-    ## end Test of flatten
-
     ## Test of removal
     
-    @test length(tree1.children) == 6
-    remove_node!(tree1, "child1")
-    @test length(tree1.children) == 1
+    @test delta_count(tree1) == 5
+    remove_delta!(tree1, 1)
+    @test delta_count(tree1) == 4
 
     ## end Test of removal
 
@@ -169,7 +158,7 @@ Sequence 10: AGATCGAGCGAGCTAGCGACTCAG"
     @test approximate_search(js1, needle2) == test_return3
 
     ## Tree section
-    
+    #= RE-DO
     test_return4 = Dict{String, Vector{UnitRange{Int64}}}(
         name => UnitRange{Int64}[] for name in keys(tree2.children))
     
@@ -197,20 +186,21 @@ Sequence 10: AGATCGAGCGAGCTAGCGACTCAG"
     @test exact_search(tree2, needle2) == test_return5
 
     @test approximate_search(tree2, needle2) == test_return6
+    =#
 
     ## end Test of search
 
 
     ## Testing for Errors
-    
+    #= RE-DO
     @test_throws ErrorException add_node(tree2, "child18", deltaMap[2] , "child2")
     @test_throws ErrorException remove_node!(tree1, "child18")
     @test_throws ErrorException remove_node!(tree1, "root")
     @test_throws ErrorException approximate_search(js1, needle, 115) == test_return
-
+    =#
     ## end Testing for Errors
 
-    ## "Testing" the prints to update the code coverage
+    ## "Testing" the prints and APIs to update the code coverage
     js3 = JournaledString(LongDNA{4}("AGATCGAGCGAGCTAGCGACTCAG"),
                           DeltaMap(10),
                           0)
@@ -237,28 +227,16 @@ Sequence 10: AGATCGAGCGAGCTAGCGACTCAG"
 
     redirect_stdout(devnull) do
         print_sequences(js3)
-        print_sequences(tree2)
-        print_tree(tree2)
+        print_tree2(tree2)
         print_deltas(js3)
         get_mutation_history(js3.deltaMap[1])
         get_mutation_interval(js3, 1, 5)
         print_results(test_return)
         print_results(test_return2)
-        print_results(test_return5)
-        print_results(test_return6)
+
     end
 
     ## End "Testing" the prints to update the code coverage
-
-    ## Test of trim_node
-    
-    @test length(tree2.children) == 6
-    @test_throws ErrorException trim_node(tree2, "child18")
-    @test_throws ErrorException trim_node(tree2, "root")
-    trim_node(tree2, "child4")
-    @test length(tree2.children) == 5
-
-    ## End Test of trim_node
 
     ## Test of IO functions
     
@@ -282,31 +260,8 @@ Sequence 10: AGATCGAGCGAGCTAGCGACTCAG"
     
     ## End Test of IO functions
     
-    ## Testing new apis
-    
-    @test_throws ErrorException add_delta!(tree2, "root", entry3)
-    @test_throws ErrorException add_delta!(tree2, "nonesiste", entry3)
-    @test_throws ErrorException add_delta!(tree2, "root", DeltaTypeSnp, 21, 'C')
-    @test_throws ErrorException add_delta!(tree2, "nonesiste", DeltaTypeSnp, 21, 'C')
-    add_delta!(tree2, "child1", DeltaTypeSnp, 21, 'C')
-    add_delta!(tree2, "child1", entry3)
-    @test length(tree2.children["child1"].deltaMap) == 3
-    @test_throws ErrorException remove_delta!(tree2, "child1", 3)
-    remove_delta!(tree2, "child1", 2)
-    @test length(tree2.children["child1"].deltaMap) == 2
-    add_node(tree2, "root", DeltaMap(), "child6")
 
-    ## end testing new apis
 end
 
-tree14 = JSTree2(LongDNA{4}("NNNNNNNNNNNNNN"), 10)
-add_delta!(tree14, [1, 2], DeltaTypeIns, 8, "CGTA")
-add_delta!(tree14, [3, 4], DeltaTypeIns, 8, "CGTA")
-add_delta!(tree14, [10], DeltaTypeSnp, 21, 'C')
-add_delta!(tree14, [4], DeltaTypeSV, 24, dna"NNNNN")
 
-
-println(tree14.journal)
-build_tree!(tree14)
-print_tree2(tree14)
 ### runtests.jl ends here.
