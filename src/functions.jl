@@ -552,6 +552,39 @@ function remove_delta!(js :: JournaledString, idx :: Int, time :: Int)
     end
 end
 
+"""
+Removes a delta entry from a JSTree2 by time key.
+
+# Args:
+   - `tree`: The JSTree2 structure.
+   - `time`: Time key of the delta entry to remove.
+
+# Returns:
+   - `nothing` (modifies JSTree2 in place)
+
+# Throws:
+   - `ErrorException` if no matching delta is found.
+# Examples: 
+```julia-repl
+    julia> remove_delta!(jst, 5) 
+```
+"""
+function remove_delta!(tree::JSTree2, time::Int)
+    # Walk through each bucket of deltas in the journal
+    for (pos, bucket) in tree.journal
+        for (idx, delta) in bucket
+            if delta.time == time
+                delete!(bucket, idx)
+                isempty(bucket) && delete!(tree.journal, pos)
+                return nothing
+            end
+        end
+    end
+
+    # If we get here, no delta had that time
+    error("No delta found for time=$time in JSTree2 journal")
+end
+
 # needs overloading
 function add_delta2!(tree::JSTree2, entry::JournalEntry)
     pos = entry.position
@@ -573,6 +606,7 @@ function add_delta2!(tree::JSTree2, entry::JournalEntry)
     
     current_node[pos] = new_node
 end
+
 """
 Removes a delta by time key.
 
