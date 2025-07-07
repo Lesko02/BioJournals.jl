@@ -348,7 +348,8 @@ function add_delta!(js :: JournaledString,
     end
 end
 
-#new experimental for jst2
+"""
+"""
 function add_delta!(tree :: JSTree2,
                     indices :: Vector{Int}, 
                     delta_type :: DeltaType,
@@ -390,6 +391,53 @@ function add_delta!(tree :: JSTree2,
     end
 
     
+end
+
+"""
+Insert a JournalEntry template into a JSTree2, stamping each insertion
+with the tree’s current_time (and then incrementing it).
+
+# Args
+- `tree`     : the JSTree2 to modify
+- `indices`  : Vector of sequence‐indices where this entry applies
+- `entry`    : a JournalEntry whose `delta_type`, `position`, and `data`
+               we’ll reuse (its `.time` is ignored)
+
+# Returns
+- `nothing`  : mutates `tree.journal` and `tree.current_time`
+"""
+function add_delta!(tree::JSTree2, indices::Vector{Int}, entry::JournalEntry)
+    pos = Int64(entry.position)
+
+    # grab or initialize the list of same‐kind buckets at this position
+    vec = get!(tree.journal, pos) do
+        Vector{Dict{Int64,JournalEntry}}()
+    end
+
+    # look for an existing bucket matching (delta_type, data)
+    bucket = findfirst(b -> begin
+            e = first(values(b))
+            e.delta_type == entry.delta_type && e.data === entry.data
+        end, vec)
+
+    # if none found, make a fresh one
+    if bucket === nothing
+        bucket = Dict{Int64,JournalEntry}()
+        push!(vec, bucket)
+    end
+
+    # now insert one stamped entry per index
+    for idx in indices
+        # create a fresh entry with the current tree clock
+        stamped = JournalEntry(entry.delta_type,
+                               entry.position,
+                               entry.data,
+                               tree.current_time)
+        bucket[Int64(idx)] = stamped
+        tree.current_time += UInt64(1)
+    end
+
+    return nothing
 end
 
 function build_tree!(tree::JSTree2)
@@ -583,28 +631,6 @@ function remove_delta!(tree::JSTree2, time::Int)
 
     # If we get here, no delta had that time
     error("No delta found for time=$time in JSTree2 journal")
-end
-
-# needs overloading
-function add_delta2!(tree::JSTree2, entry::JournalEntry)
-    pos = entry.position
-    current_node = tree.children
-    path = []
-
-    while pos in keys(current_node)
-        path_node = current_node[pos]
-        path = [path..., path_node]
-        current_node = path_node.children
-    end
-
-    # new node at position
-    parent = isempty(path) ? nothing : last(path)
-    deltaMap = DeltaMap()
-    deltaMap[entry.time] = entry
-    children = Dict{Int64, JSTNode2}()
-    new_node = JSTNode2(parent, deltaMap, children)
-    
-    current_node[pos] = new_node
 end
 
 """
