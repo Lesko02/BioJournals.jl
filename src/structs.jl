@@ -118,20 +118,20 @@ function JournaledString(reference :: LongDNA{4})
 end
 
 
+
 """
 A node in a Journaled String Tree (JST).
 
 # Fields: 
    - `parent`: Reference to the parent node (or nothing if root). 
-   - `deltaMap`: Modifications applied at this node (or nothing). 
-   - `name`: Name of the node.
+   - `delta`: Modifications applied at this node. 
+   - `children`: Children of the node.
 """
 mutable struct JSTNode
     parent   :: Union{Nothing, JSTNode}
-    deltaMap :: Union{Nothing, DeltaMap}
-    name     :: String
+    delta    :: Dict{Int64, JournalEntry}
+    children :: Vector{JSTNode}
 end
-
 
 """
 A Journaled String Tree (JST).
@@ -144,116 +144,19 @@ A Journaled String Tree (JST).
    - JSTree(root_sequence) 
    - Initializes with a `root` node named "root".
 """
-struct JSTree
-    root :: LongDNA{4}
-    children :: Dict{String, JSTNode}
-end
-
-function JSTree(root_sequence :: LongDNA{4})
-    root_node = JSTNode(nothing, nothing, "root")
-    return JSTree(root_sequence, Dict("root" => root_node))
-end
-
-
-"""
-Adds a new node to a JSTree.
-
-# Args: 
-   - `tree`: The JSTree structure. 
-   - `parent_name`: Name of the parent node. 
-   - `deltas`: DeltaMap of modifications for the new node. 
-   - `node_name`: Name of the new node.
-
-# Returns: 
-   - None (modifies the JSTree).
-
-# Errors: 
-   - Throws an error if the `parent` node does not exist.
-"""
-function add_node(tree :: JSTree,
-                  parent_name :: String,
-                  deltas :: DeltaMap, 
-                  node_name :: String)
-
-    if !haskey(tree.children, parent_name)
-        error("Parent node '$parent_name' does not exist.")
-    else
-        parent_node = tree.children[parent_name]
-        new_node = JSTNode(parent_node, deltas, node_name)
-    end
-    tree.children[node_name] = new_node
-end
-
-
-"""
-Removes a node and all its descendants from a JSTree.
-
-# Arguments
-- `tree :: JSTree`: The journaled string tree.
-- `node_name :: String`: The name of the node to remove.
-
-# Errors
-- Throws an error if the node does not exist or if attempting to remove the root.
-"""
-function remove_node!(tree :: JSTree, node_name :: String)
-    if node_name == "root"
-        error("Cannot remove the root node.")
-    end
-    if !haskey(tree.children, node_name)
-        error("Node '$node_name' does not exist.")
-    end
-    
-    for (child_name, child_node) in collect(tree.children)
-        if child_node.parent !== nothing && child_node.parent.name == node_name
-            remove_node!(tree, child_name)
-        end
-    end
-    delete!(tree.children, node_name)
-end
-
-
-function get_parent(jst :: JSTree, node_name :: String)
-    node = jst.children[node_name]
-    return node.parent
-end
-
-
-function trim_node(jst :: JSTree, node_name :: String)
-    if node_name == "root"
-        error("Cannot trim the root node.")
-    end
-    if !haskey(jst.children, node_name)
-        error("Node '$node_name' does not exist.")
-    end
-    
-    for (child_name, child_node) in collect(jst.children)
-        if child_node.parent !== nothing && child_node.parent.name == node_name
-            child_node.parent = get_parent(jst, node_name)
-        end
-    end
-    delete!(jst.children, node_name)
-end
-
-
-mutable struct JSTNode2
-    parent   :: Union{Nothing, JSTNode2}
-    delta    :: Dict{Int64, JournalEntry}
-    children :: Vector{JSTNode2}
-end
-
-mutable struct JSTree2
+mutable struct JSTree
     root         :: LongDNA{4}
-    rootChildren :: Vector{JSTNode2}
+    rootChildren :: Vector{JSTNode}
     journal      :: SortedDict{Int64, Vector{Dict{Int64, JournalEntry}}}
     current_time :: Timestamp
     length       :: Int
 end
 
-function JSTree2(root::LongDNA{4}, default_length::Int)
+function JSTree(root::LongDNA{4}, default_length::Int)
     journal = SortedDict{Int64, Dict{Int64, JournalEntry}}()
-    return JSTree2(
+    return JSTree(
         root,
-        JSTNode2[],
+        JSTNode[],
         SortedDict{Int64, Vector{Dict{Int64,JournalEntry}}}(),
         0,
         default_length
