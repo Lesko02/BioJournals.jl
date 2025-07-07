@@ -136,74 +136,6 @@ end
 
 
 """
-Perform approximate search in a Journaled String Tree (JST).
-
-# Args:
-   - `jst`: The JSTree to search in.
-   - `needle`: The LongDNA{4} sequence to find.
-
-# Returns:
-    A dictionary mapping node names to match ranges.
-"""
-function approximate_search(jst :: JSTree, needle :: LongDNA{4})
-
-    seq = jst.root
-    query = ApproximateSearchQuery(needle)
-    vector = UnitRange{Int}[]
-    indexMatrix = Dict{String,
-                       Vector{UnitRange{Int64}}}(
-                           name => UnitRange{Int64}[] for name in keys(jst.children))
-    tolerance = ceil(Int64, (length(needle) / 100) * 5)
-
-    vector = approximate_findall(query, tolerance, seq)
-    to_remove = Set{UnitRange{Int64}}()
-    to_add = Set{UnitRange{Int64}}()
-    range2 = Set{UnitRange{Int64}}()
-
-    for (name, _) in indexMatrix
-        indexMatrix[name] = vector
-    end
-
-    for (name, node) in jst.children
-
-        for range in indexMatrix[name]
-
-            empty!(to_add)
-            empty!(to_remove)
-            if !isnothing(node.deltaMap)
-                empty!(range2)
-                seq = flatten(jst, node.parent.name)
-                range2 = push!(range2, range)
-                range2 = union!(range2, approximate_findall(query, 
-                tolerance, seq))
-                union!(to_add, range2)
-                for (time, entry) in node.deltaMap
-                    for range3 in range2
-                        if entry.position in range3
-                            
-                            seq = apply_delta(seq, entry)
-                                
-                            for element in
-                                approximate_findall(query, tolerance, seq)
-                                push!(to_add, element)
-                            end
-                            push!(to_remove, range3)   
-                        end
-                    end
-                end
-                append!(indexMatrix[name], to_add)
-                indexMatrix[name]= filter(x -> all(y -> x != y, to_remove), 
-                                          indexMatrix[name])
-                
-            end
-            indexMatrix[name] = collect(Set(indexMatrix[name]))
-        end
-    end
-    return indexMatrix
-end
-
-
-"""
 Perform exact search in a JournaledString.
 
 # Args:
@@ -238,41 +170,7 @@ Perform exact search in a Journaled String Tree (JST).
 # Returns: 
    - A dictionary mapping node names to exact match ranges.
 """
-function exact_search(jst :: JSTree, needle :: LongDNA{4})
-    indexMatrix = Dict{String, Vector{UnitRange{Int64}}}()
-    query = ExactSearchQuery(needle)
-    vector = UnitRange{Int}[]
-
-    indexMatrix =
-        Dict{String,
-             Vector{UnitRange{Int64}}}(
-                 name => UnitRange{Int64}[] for name in keys(jst.children))
-    
-    for (name, child) in jst.children
-
-        empty!(vector)
-        if (!isnothing(child.deltaMap))
-            seq = flatten(jst, name)
-            vector = BioSequences.findall(query, seq)
-        end
-
-        indexMatrix[name] = append!(indexMatrix[name], vector)
-        
-    end
-    return indexMatrix
-end
-
-"""
-Perform exact search in a Journaled String Tree 2(JST).
-
-# Args: 
-   - `jst`: The JSTree2 to search in. 
-   - `needle`: The LongDNA{4} sequence to find.
-
-# Returns: 
-   - A dictionary mapping node names to exact match ranges.
-"""
-function exact_search(tree::JSTree2, needle::LongDNA{4})
+function exact_search(tree::JSTree, needle::LongDNA{4})
     # prepare a dict of result‐vectors for each sequence index
     results = Dict(i => UnitRange{Int64}[] for i in 1:tree.length)
     # build the exact‐search query once
@@ -302,109 +200,161 @@ function exact_search(tree::JSTree2, needle::LongDNA{4})
     return results
 end
 
-function approximate_search(tree::JSTree2, needle::LongDNA{4})
-    tol         = ceil(Int, length(needle) * 0.05)
-    query       = ApproximateSearchQuery(needle)
+"""
+Perform approximate search in a Journaled String Tree (JST).
 
-    # initial root matches
-    root_hits   = approximate_findall(query, tol, tree.root)
-    results     = Dict(i => copy(root_hits) for i in 1:tree.length)
-    results_set = Dict(i => Set(root_hits)  for i in 1:tree.length)
+# Args:
+   - `jst`: The JSTree to search in.
+   - `needle`: The LongDNA{4} sequence to find.
+
+# Returns:
+    A dictionary mapping node names to match ranges.
+"""
+
+function approximate_search(tree::JSTree, needle::LongDNA{4})
+
+    tol = ceil(Int64, (length(needle) / 100) * 5) 
+    query = ApproximateSearchQuery(needle)
+
+    # Initial root matches
+    root_hits = approximate_findall(query, tol, tree.root)
+    results = Dict(i => copy(root_hits) for i in 1:tree.length)
+    results_set = Dict(i => Set(root_hits) for i in 1:tree.length)
+
+    # Collect journal positions once (outside sequence loop)
+    journal_positions = collect(keys(tree.journal))
+    sort!(journal_positions)  # Ensure processing in position order
 
     for i in 1:tree.length
         applied = false
-        seq     = nothing
+        current_seq = nothing
+        current_positions = copy(journal_positions)  # Positions to process for this sequence
 
-        for (_pos, buckets) in tree.journal
+        # Process journal entries in position order
+        for pos in current_positions
+            buckets = tree.journal[pos]
             for bucket in buckets
                 if haskey(bucket, Int64(i))
-                    entry      = bucket[Int64(i)]
-                    # find which current hits this entry invalidates
+                    entry = bucket[Int64(i)]
+                    # Check if this entry affects existing hits
                     hit_ranges = collect(results_set[i])
-                    invalid    = [r for r in hit_ranges if entry.position in r]
+                    invalid = [r for r in hit_ranges if entry.position in r]
 
-                    # only if there are invalidated root‐hits do we proceed
                     if !isempty(invalid)
                         if !applied
-                            seq              = copy(tree.root)
-                            results_set[i]   = Set()   # drop all old hits
-                            applied          = true
+                            # Initialize sequence with root only once
+                            current_seq = copy(tree.root)
+                            results_set[i] = Set()
+                            applied = true
                         end
 
-                        # remove just the invalidated ranges
+                        # Remove invalidated ranges
                         for r in invalid
                             delete!(results_set[i], r)
                         end
 
-                        # apply mutation and add new approximate hits
-                        seq = apply_delta(seq, entry)
-                        for newr in approximate_findall(query, tol, seq)
+                        # Apply mutation and get new hits
+                        current_seq = apply_delta(current_seq, entry)
+                        new_hits = approximate_findall(query, tol, current_seq)
+                        
+                        # Add new hits and break out after applying mutation
+                        for newr in new_hits
                             push!(results_set[i], newr)
                         end
+                        
+                        # BREAK AFTER APPLYING MUTATION
+                        break  # Exit bucket loop after applying mutation
                     end
                 end
             end
         end
 
-        # finalize
-        results[i] = collect(results_set[i])
+        # Finalize results for this sequence
+        results[i] = sort!(collect(results_set[i]), by=first)
     end
 
     return results
 end
 
-function approximate_search(tree::JSTree2, needle::LongDNA{4}, tol::Int64)
+"""
+Perform approximate search in a Journaled String Tree (JST) with tolerance.
 
+# Args:
+   - `jss`: The JournaledString to search in.
+   - `needle`: The LongDNA{4} sequence to find.
+   - `tol`: Allowed mismatch percentage (1-99%).
+
+# Returns:
+   - A dictionary mapping time points to match ranges.
+
+# Errors:
+   - Throws an error if tolerance is ≤0% or ≥100%.
+"""
+function approximate_search(tree::JSTree, needle::LongDNA{4}, tol::Int64)
     if tol <= 0 || tol >= 100
         error("Tolerance cannot less or 0% or more than 100%")
     end
     tolerance = ceil(Int64, (length(needle) / 100) * tol) 
-    query       = ApproximateSearchQuery(needle)
+    query = ApproximateSearchQuery(needle)
 
-    # initial root matches
-    root_hits   = approximate_findall(query, tolerance, tree.root)
-    results     = Dict(i => copy(root_hits) for i in 1:tree.length)
-    results_set = Dict(i => Set(root_hits)  for i in 1:tree.length)
+    # Initial root matches
+    root_hits = approximate_findall(query, tolerance, tree.root)
+    results = Dict(i => copy(root_hits) for i in 1:tree.length)
+    results_set = Dict(i => Set(root_hits) for i in 1:tree.length)
+
+    # Collect journal positions once (outside sequence loop)
+    journal_positions = collect(keys(tree.journal))
+    sort!(journal_positions)  # Ensure processing in position order
 
     for i in 1:tree.length
         applied = false
-        seq     = nothing
+        current_seq = nothing
+        current_positions = copy(journal_positions)  # Positions to process for this sequence
 
-        for (_pos, buckets) in tree.journal
+        # Process journal entries in position order
+        for pos in current_positions
+            buckets = tree.journal[pos]
             for bucket in buckets
                 if haskey(bucket, Int64(i))
-                    entry      = bucket[Int64(i)]
-                    # find which current hits this entry invalidates
+                    entry = bucket[Int64(i)]
+                    # Check if this entry affects existing hits
                     hit_ranges = collect(results_set[i])
-                    invalid    = [r for r in hit_ranges if entry.position in r]
+                    invalid = [r for r in hit_ranges if entry.position in r]
 
-                    # only if there are invalidated root‐hits do we proceed
                     if !isempty(invalid)
                         if !applied
-                            seq              = copy(tree.root)
-                            results_set[i]   = Set()   # drop all old hits
-                            applied          = true
+                            # Initialize sequence with root only once
+                            current_seq = copy(tree.root)
+                            results_set[i] = Set()
+                            applied = true
                         end
 
-                        # remove just the invalidated ranges
+                        # Remove invalidated ranges
                         for r in invalid
                             delete!(results_set[i], r)
                         end
 
-                        # apply mutation and add new approximate hits
-                        seq = apply_delta(seq, entry)
-                        for newr in approximate_findall(query, tol, seq)
+                        # Apply mutation and get new hits
+                        current_seq = apply_delta(current_seq, entry)
+                        new_hits = approximate_findall(query, tolerance, current_seq)
+                        
+                        # Add new hits and break out after applying mutation
+                        for newr in new_hits
                             push!(results_set[i], newr)
                         end
+                        
+                        # BREAK AFTER APPLYING MUTATION
+                        break  # Exit bucket loop after applying mutation
                     end
                 end
             end
         end
 
-        # finalize
-        results[i] = collect(results_set[i])
+        # Finalize results for this sequence
+        results[i] = sort!(collect(results_set[i]), by=first)
     end
 
     return results
 end
+
 ### algorithms.jl ends here.
