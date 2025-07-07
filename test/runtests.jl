@@ -53,18 +53,18 @@ using BioJournals
     ## end Test of comparisons JSS
 
     ## Test of comparisons JST
-    
-    tree1 = JSTree2(LongDNA{4}("AGATCGAGCGAGCTAGCGACTCAG"), 10)
+
+    tree1 = JSTree(LongDNA{4}("AGATCGAGCGAGCTAGCGACTCAG"), 10)
     add_delta!(tree1, [1, 2], DeltaTypeIns, 8, "CGTA")
     add_delta!(tree1, [4, 9], DeltaTypeSnp, 10, 'C')
     add_delta!(tree1, [8], DeltaTypeIns, 24, "NNNNN")
     
-    tree2 = JSTree2(LongDNA{4}("AGATCGAGCGAGCTAGCGACTCAG"), 10)
+    tree2 = JSTree(LongDNA{4}("AGATCGAGCGAGCTAGCGACTCAG"), 10)
     add_delta!(tree2, [1, 2], DeltaTypeIns, 8, "CGTA")
     add_delta!(tree2, [4, 9], DeltaTypeSnp, 10, 'C')
     add_delta!(tree2, [8], DeltaTypeIns, 24, "NNNNN")
 
-    treecpy = JSTree2(LongDNA{4}("AGATCGAGCGAGCTAGCGACTCAGCCCCCC"), 10)
+    treecpy = JSTree(LongDNA{4}("AGATCGAGCGAGCTAGCGACTCAGCCCCCC"), 10)
     add_delta!(treecpy, [1, 2], DeltaTypeIns, 8, "CGTA")
     add_delta!(treecpy, [4, 9], DeltaTypeSnp, 10, 'C')
     add_delta!(treecpy, [8], DeltaTypeIns, 24, "NNNNN")
@@ -73,7 +73,6 @@ using BioJournals
     @test is_equal(tree1, tree2) == true
     @test Base.isequal(tree1, tree2) == false
     @test is_equal(tree1, treecpy) == false
-
     ## end Test of comparisons JST
 
     test_return_build = "Sequence 1: AGATCGACGTAGCGAGCTAGCGACTCAG
@@ -118,6 +117,7 @@ Sequence 10: AGATCGAGCGAGCTAGCGACTCAG"
     ## Test of search
     
     test_return = Dict(i => UnitRange{Int64}[] for i in 1:length(js1.deltaMap))
+
     test_return2= Dict(
         1 => [16:19],
         2 => [16:19],
@@ -143,7 +143,20 @@ Sequence 10: AGATCGAGCGAGCTAGCGACTCAG"
         9 => [8:11, 13:15],
         10 => [8:11, 13:15]
     )
-    
+
+    test_return4= Dict(
+    1 => [9:11, 16:18, 20:23],
+    2 => [9:11, 16:18, 20:23],
+    3 => [8:11, 13:15],
+    4 => [8:11, 13:15],
+    5 => [8:11, 13:15],
+    6 => [8:11, 13:15],
+    7 => [8:11, 13:15],
+    8 => [8:11, 13:15],
+    9 => [8:11, 13:15],
+    10 => [8:11, 13:15]    
+    )
+
     needle = LongDNA{4}("AAAAAAAAAA")
     @test exact_search(js1, needle) == test_return
 
@@ -159,18 +172,19 @@ Sequence 10: AGATCGAGCGAGCTAGCGACTCAG"
 
     ## Tree section
     
-    test_tree = JSTree2(LongDNA{4}("AGATCGAGCGAGCTAGCGACTCAG"), 10)
+    test_tree = JSTree(LongDNA{4}("AGATCGAGCGAGCTAGCGACTCAG"), 10)
     add_delta!(test_tree, [1, 2], DeltaTypeIns, 8, "CGTA")
 
     @test exact_search(test_tree, needle) == test_return
-    @test approximate_search(test_tree, needle) == test_return
-    @test approximate_search(test_tree, needle, 15) == test_return
-
     @test exact_search(test_tree, needle2) == test_return2
-    @test approximate_search(test_tree, needle2, 5) == test_return3
-    @test approximate_search(test_tree, needle2) == test_return3
 
+    @test approximate_search(test_tree, needle) == test_return
+    @test approximate_search(test_tree, needle2) == test_return4
 
+    @test approximate_search(test_tree, needle, 15) == test_return
+    @test approximate_search(test_tree, needle2, 5) == test_return4
+
+    
     ## end Test of search
 
 
@@ -210,7 +224,7 @@ Sequence 10: AGATCGAGCGAGCTAGCGACTCAG"
 
     redirect_stdout(devnull) do
         print_sequences(js3)
-        print_tree2(tree2)
+        print_tree(tree2)
         print_deltas(js3)
         get_mutation_history(js3.deltaMap[1])
         get_mutation_interval(js3, 1, 5)
