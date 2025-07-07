@@ -171,6 +171,25 @@ function is_equal(jst1 :: JSTree, jst2 :: JSTree) :: Bool
     return true
 end
 
+"""
+Check if two Journaled String Trees (JSTrees) are equal.
+
+Args: 
+    jst1: The first JSTree. 
+    jst2: The second JSTree.
+
+Returns: 
+    `true` if both trees have identical root sequences and children.
+"""
+function is_equal(jst1 :: JSTree2, jst2 :: JSTree2) :: Bool
+    ## Compare root sequences (assumed immutable)
+    jst1.root != jst2.root && return false
+    jst1.current_time != jst2.current_time && return false
+    
+    return true
+end
+
+
 
 """
 Print search results from a JournaledString.
