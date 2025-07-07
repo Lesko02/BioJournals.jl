@@ -2,25 +2,6 @@
 
 ### algorithms.jl
 
-#= NotYetCoded
-function horspool_find(jss :: JournaledString, needle :: LongDNA{4})
-    # Yet to be coded
-end
-
-function horspool_find(jst :: JSTree, needle :: LongDNA{4})
-    # Yet to be coded
-end
-
-function myers_ukkoken_find(jss :: JournaledString, needle :: LongDNA{4})
-    # Yet to be coded
-end
-
-function myers_ukkoken_find(jst :: JSTree, needle :: LongDNA{4})
-    # Yet to be coded
-end
-=#
-
-
 """
 Find all approximate matches of a query in a DNA sequence.
 
@@ -327,6 +308,61 @@ function approximate_search(tree::JSTree2, needle::LongDNA{4})
 
     # initial root matches
     root_hits   = approximate_findall(query, tol, tree.root)
+    results     = Dict(i => copy(root_hits) for i in 1:tree.length)
+    results_set = Dict(i => Set(root_hits)  for i in 1:tree.length)
+
+    for i in 1:tree.length
+        applied = false
+        seq     = nothing
+
+        for (_pos, buckets) in tree.journal
+            for bucket in buckets
+                if haskey(bucket, Int64(i))
+                    entry      = bucket[Int64(i)]
+                    # find which current hits this entry invalidates
+                    hit_ranges = collect(results_set[i])
+                    invalid    = [r for r in hit_ranges if entry.position in r]
+
+                    # only if there are invalidated root‐hits do we proceed
+                    if !isempty(invalid)
+                        if !applied
+                            seq              = copy(tree.root)
+                            results_set[i]   = Set()   # drop all old hits
+                            applied          = true
+                        end
+
+                        # remove just the invalidated ranges
+                        for r in invalid
+                            delete!(results_set[i], r)
+                        end
+
+                        # apply mutation and add new approximate hits
+                        seq = apply_delta(seq, entry)
+                        for newr in approximate_findall(query, tol, seq)
+                            push!(results_set[i], newr)
+                        end
+                    end
+                end
+            end
+        end
+
+        # finalize
+        results[i] = collect(results_set[i])
+    end
+
+    return results
+end
+
+function approximate_search(tree::JSTree2, needle::LongDNA{4}, tol::Int64)
+
+    if tol <= 0 || tol >= 100
+        error("Tolerance cannot less or 0% or more than 100%")
+    end
+    tolerance = ceil(Int64, (length(needle) / 100) * tol) 
+    query       = ApproximateSearchQuery(needle)
+
+    # initial root matches
+    root_hits   = approximate_findall(query, tolerance, tree.root)
     results     = Dict(i => copy(root_hits) for i in 1:tree.length)
     results_set = Dict(i => Set(root_hits)  for i in 1:tree.length)
 
