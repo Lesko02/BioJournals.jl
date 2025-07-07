@@ -158,35 +158,18 @@ Sequence 10: AGATCGAGCGAGCTAGCGACTCAG"
     @test approximate_search(js1, needle2) == test_return3
 
     ## Tree section
-    #= RE-DO
-    test_return4 = Dict{String, Vector{UnitRange{Int64}}}(
-        name => UnitRange{Int64}[] for name in keys(tree2.children))
     
-    voidvector = UnitRange{Int64}[]
-    test_return5 = Dict( 
-        "child1" => [16:19],
-        "root"   => voidvector,
-        "child2" => [20:23],
-        "child3" => [16:19],
-        "child5" => [16:19],
-        "child4" => [16:19]
-    )
+    test_tree = JSTree2(LongDNA{4}("AGATCGAGCGAGCTAGCGACTCAG"), 10)
+    add_delta!(test_tree, [1, 2], DeltaTypeIns, 8, "CGTA")
 
-    test_return6 = Dict(
-        "child1" => [16:18, 13:15, 20:23, 9:11],
-        "root" => [16:18, 8:11, 13:15, 20:23, 9:11],
-        "child2" => [9:11, 13:15, 24:27, 20:22, 16:18, 20:23],
-        "child3" => [20:23, 8:11, 13:15, 24:27, 20:22, 9:11, 16:18],
-        "child5" => [20:23, 8:11, 13:15, 24:27, 20:22, 9:11, 16:18],
-        "child4" => [13:15, 24:27, 20:22, 20:23, 16:18]
-    )
+    @test exact_search(test_tree, needle) == test_return
+    @test approximate_search(test_tree, needle) == test_return
+    @test approximate_search(test_tree, needle, 15) == test_return
 
-    @test exact_search(tree2, needle) == test_return4
+    @test exact_search(test_tree, needle2) == test_return2
+    @test approximate_search(test_tree, needle2, 5) == test_return3
+    @test approximate_search(test_tree, needle2) == test_return3
 
-    @test exact_search(tree2, needle2) == test_return5
-
-    @test approximate_search(tree2, needle2) == test_return6
-    =#
 
     ## end Test of search
 
