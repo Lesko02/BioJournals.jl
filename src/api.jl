@@ -13,12 +13,11 @@ Retrieve the full mutation history from a DeltaMap.
    - A string listing all mutations with timestamps.
 """
 function get_mutation_history(delta_map :: DeltaMap)
-    mutation_history = ""
+    io = IOBuffer()
     for (time, entry) in delta_map
-        time_int = UInt64(time)  # Explicit conversion
-        mutation_history *= "Time $time_int: $entry\n"
+        println(io, "Time ", UInt64(time), ": ", entry)
     end
-    return mutation_history
+    return String(take!(io))
 end
 
 
@@ -37,15 +36,15 @@ function get_mutation_interval(js :: JournaledString,
                                time1 :: Int,
                                time2 :: Int)
     
-    mutation_interval = ""
+    io = IOBuffer()
     for i in 1:length(js.deltaMap)
         for (time, entry) in js.deltaMap[i]
             if time1 <= time <= time2
-                mutation_interval *= "Time $time: $entry at index $i\n"
+                println(io, "Time ", time, ": ", entry, " at index ", i)
             end
         end
     end
-    return mutation_interval
+    return String(take!(io))
 end
 
 
@@ -124,70 +123,30 @@ Check if two JournaledStrings are equal.
 """
 function is_equal(jst1 :: JournaledString,
                   jst2 :: JournaledString) :: Bool
-    if hash(jst1.reference) != hash(jst2.reference)
-        return false
-    end
-    if jst1.current_time != jst2.current_time
-        return false
-    end
-    return hash(jst1.deltaMap) == hash(jst2.deltaMap)
+    return jst1.reference == jst2.reference &&
+           jst1.current_time == jst2.current_time &&
+           jst1.deltaMap == jst2.deltaMap
 end
-
-
-### Multiple dispactch of == operator
-#=
-Base.:(==)(a :: JSTNode, b :: JSTNode) = 
-    a.name == b.name && 
-    hash(a.deltaMap) == hash(b.deltaMap) && 
-    a.parent == b.parent 
-
 
 
 """
 Check if two Journaled String Trees (JSTrees) are equal.
+
+`rootChildren` is a cache built by `build_tree!` and is not compared.
+Two trees are equal when their reference, clock, length, and journal match.
 
 Args: 
     jst1: The first JSTree. 
     jst2: The second JSTree.
 
 Returns: 
-    `true` if both trees have identical root sequences and children.
+    `true` if both trees describe the same sequences.
 """
 function is_equal(jst1 :: JSTree, jst2 :: JSTree) :: Bool
-    ## Compare root sequences (assumed immutable)
-    jst1.root != jst2.root && return false
-    
-    ## Check child keys match
-    keys1 = sort(collect(keys(jst1.children)))
-    keys2 = sort(collect(keys(jst2.children)))
-    keys1 != keys2 && return false
-    
-    ## Compare each child node structurally
-    for key in keys1
-        node1 = jst1.children[key]
-        node2 = jst2.children[key]
-        node1 != node2 && return false
-    end
-    
-    return true
-end
-=#
-"""
-Check if two Journaled String Trees (JSTrees) are equal.
-
-Args: 
-    jst1: The first JSTree. 
-    jst2: The second JSTree.
-
-Returns: 
-    `true` if both trees have identical root sequences and children.
-"""
-function is_equal(jst1 :: JSTree, jst2 :: JSTree) :: Bool
-    ## Compare root sequences (assumed immutable)
-    jst1.root != jst2.root && return false
-    jst1.current_time != jst2.current_time && return false
-    
-    return true
+    return jst1.root == jst2.root &&
+           jst1.current_time == jst2.current_time &&
+           jst1.length == jst2.length &&
+           jst1.journal == jst2.journal
 end
 
 

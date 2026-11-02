@@ -1,6 +1,6 @@
 # BioJournals
 
-[![Julia](https://img.shields.io/badge/Julia-1.11.1-blue)](https://julialang.org/)
+[![Julia](https://img.shields.io/badge/Julia-1.12%20%7C%201.13-blue)](https://julialang.org/)
 [![Build Status](https://github.com/Lesko02/BioJournals.jl/actions/workflows/CI.yml/badge.svg?branch=main)](https://github.com/Lesko02/BioJournals.jl/actions/workflows/CI.yml?query=branch%3Amain)
 [![Coverage](https://codecov.io/gh/Lesko02/BioJournals.jl/branch/main/graph/badge.svg)](https://codecov.io/gh/Lesko02/BioJournals.jl)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
@@ -17,7 +17,7 @@ complex) data structure.
 
 ## Goal
 
-The goal of the the `BioJournals` project is to provide a **Julia**
+The goal of the `BioJournals` project is to provide a **Julia**
 library that implements a form of *journaled sequence*, alongside a
 proper API for its manipulation.  An important *key* identifying such
 sequences will be *time*.
@@ -30,6 +30,9 @@ like a **Julia** implementation to complement our other efforts in the
 
 
 ## Installation
+
+BioJournals requires Julia 1.12 or newer. Julia 1.10 cannot load the current
+FASTX and BioSequences dependency set.
 
 To install this package directly from GitHub, open the Julia REPL and 
 run:  
@@ -55,10 +58,10 @@ using BioJournals
 
 reference_seq = LongDNA{4}("AGATCGAGCGAGCTAGCGACTCAG")            # Creating a reference sequence
 deltaMap = DeltaMap(10)                                           # Creating a DeltaMap object
-jst = JournaledString(reference_seq, deltaMap)                    # Inizialization
+jst = JournaledString(reference_seq, deltaMap)                    # Initialization
 
-add_delta!(jst, [1], DeltaTypeIns, 8, "CGTA")                     # Adding deltas such as Insertions
-add_delta!(jst, [2], DeltaTypeSnp, 10, 'C')                       # and Permutations
+add_delta!(jst, [1], DeltaTypeIns, 8, "CGTA")                     # Adding deltas such as insertions
+add_delta!(jst, [2], DeltaTypeSnp, 10, 'C')                       # and SNPs
 
 print_sequences(jst)                                              # Printing the modified sequences
 ```

@@ -17,15 +17,13 @@ Uses the BioJournals insert.
 
 # Examples:
 ```julia-repl
-    julia> insert!(LongDNA{4}("ACGT"), 2, LongDNA("CG")) 
-    LongDNA{4}("ACCGT") 
+    julia> String(insert!(LongDNA{4}("ACGT"), 2, LongDNA{4}("CG")))
+    "ACGCGT"
 ```
 """
 function insert!(seq :: LongDNA{4}, pos :: Int, subseq :: LongDNA)
-    for symbol in reverse(subseq)
-        BioSequences.insert!(seq, pos, symbol)
-    end
-    return seq
+    # One shift of the tail, instead of one insert per symbol.
+    return BioSequences.spliceinto!(seq, pos, subseq)
 end
 
 
@@ -41,15 +39,13 @@ Delete a range of symbols from a DNA sequence.
 
 # Examples:
 ```julia-repl
-    julia> delete_at!(LongDNA("ACGTACGT"), 3:5) 
-    LongDNA("ACACGT") 
+    julia> String(delete_at!(LongDNA{4}("ACGTACGT"), 3:5))
+    "ACACGT"
 ```
 """
 function delete_at!(seq :: LongDNA, pos_range :: UnitRange{Int})
-    for i in reverse(pos_range)
-        BioSequences.deleteat!(seq, i)
-    end
-    return seq
+    isempty(pos_range) && return seq
+    return deleteat!(seq, pos_range)
 end
 
 
@@ -83,9 +79,7 @@ function structure_variation!(seq :: LongDNA{4},
         return seq
         ## Check of an out of bounds insert --> SV
     elseif pos > lastindex(seq)
-        i = lastindex(seq)
-        range = lastindex(seq):pos-1
-        for i in range
+        for _ in lastindex(seq):pos-1
             push!(seq, '-')
         end
         append!(seq, subseq)
@@ -107,8 +101,8 @@ Apply a copy number variation (CNV).
 
 # Examples: 
 ```julia-repl
-    julia> copy_number_variation!(LongDNA{4}("ACGT"), 2, (LongDNA{4}("GG"), 3)) 
-    LongDNA{4}("ACGGGGGGT") 
+    julia> String(copy_number_variation!(LongDNA{4}("ACGT"), 2, (LongDNA{4}("GG"), 3)))
+    "AGGGGGGCGT"
 ```    
 """
 function copy_number_variation!(seq :: LongDNA{4},
@@ -208,12 +202,12 @@ Builds a string with all sequences.
 ```    
 """
 function build_sequences(js :: JournaledString)
-    builded = ""
+    io = IOBuffer()
     for i in 1:length(js.deltaMap)
         modified_seq = apply_delta(js.reference, js.deltaMap[i])
-        builded *= "Sequence $i: " * string(modified_seq) * "\n"
+        println(io, "Sequence ", i, ": ", modified_seq)
     end
-    return builded
+    return String(take!(io))
 end
 
 
@@ -280,22 +274,32 @@ function add_delta!(js :: JournaledString,
 end
 
 """
-Adds a delta to a JournaledString.
+Return the bucket of entries that share `delta_type` and `data` at one
+position, creating it when no such bucket exists.
 
-# Args:
-   - `js`: JournaledString structure. 
-   - `indices`: Indices to update. 
-   - `delta_type`: Type of delta. 
-   - `position`: Position for delta. 
-   - `data`: Data for the delta.
+Buckets are matched by value, so two separately built but equal payloads
+land in the same branch.
+"""
+function _matching_bucket!(buckets :: Vector{Dict{Int64, JournalEntry}},
+                           delta_type :: DeltaType,
+                           data)
+    for bucket in buckets
+        isempty(bucket) && continue
+        entry = first(values(bucket))
+        if entry.delta_type == delta_type && entry.data == data
+            return bucket
+        end
+    end
+    bucket = Dict{Int64, JournalEntry}()
+    push!(buckets, bucket)
+    return bucket
+end
 
-# Returns:
-   - None (modifies JournaledString).
+"""
+Adds a delta to every listed sequence in a JSTree.
 
-# Examples:
-```julia-repl
-    julia> add_delta!(js, [1, 2], DeltaTypeIns, 3, "AC") 
-```    
+Entries that share a position, delta type, and payload share one bucket,
+which `build_tree!` later turns into one branch.
 """
 function add_delta!(tree :: JSTree,
                     indices :: Vector{Int}, 
@@ -311,23 +315,7 @@ function add_delta!(tree :: JSTree,
         vec = get!(tree.journal, Int64(position)) do
             Vector{Dict{Int64,JournalEntry}}()
         end
-
-        # Search bucket
-        bucket = nothing
-        for d in vec
-            first_e = first(values(d))
-            if first_e.delta_type == delta_type &&
-               first_e.data === data
-                bucket = d
-                break
-            end
-        end
-
-        # if none found, make a new bucket
-        if bucket === nothing
-            bucket = Dict{Int64,JournalEntry}()
-            push!(vec, bucket)
-        end
+        bucket = _matching_bucket!(vec, delta_type, data)
 
         # Push entry
         bucket[Int64(idx)] = new_entry
@@ -361,17 +349,7 @@ function add_delta!(tree::JSTree, indices::Vector{Int}, entry::JournalEntry)
         Vector{Dict{Int64,JournalEntry}}()
     end
 
-    # look for an existing bucket matching (delta_type, data)
-    bucket = findfirst(b -> begin
-            e = first(values(b))
-            e.delta_type == entry.delta_type && e.data === entry.data
-        end, vec)
-
-    # if none found, make a fresh one
-    if bucket === nothing
-        bucket = Dict{Int64,JournalEntry}()
-        push!(vec, bucket)
-    end
+    bucket = _matching_bucket!(vec, entry.delta_type, entry.data)
 
     # now insert one stamped entry per index
     for idx in indices
@@ -462,18 +440,14 @@ Removes a delta by time key.
     julia> remove_delta!(js, 5) 
 ```
 """
-function remove_delta!(js :: JournaledString, idx :: Int, time :: Int)
-    deletioncc = 0
-    for (timer , entry) in js.deltaMap[idx]
-        if timer == time
-            delete!(js.deltaMap[idx], UInt(time))
-            deletioncc += 1
-        end
+function remove_delta!(js :: JournaledString, idx :: Int, time :: Integer)
+    key = Timestamp(time)
+    delta = js.deltaMap[idx]
+    if !haskey(delta, key)
+        error("No mutation found at time: $time at index: $idx")
     end
-
-    if deletioncc == 0
-        error("No mutation found at time: $time at index: $idx" )
-    end
+    delete!(delta, key)
+    return nothing
 end
 
 """
@@ -585,28 +559,26 @@ Apply a delta to a sequence.
     julia> apply_delta(ref_seq, entry)
 ```
 """
-function apply_delta(reference :: LongDNA{4}, entry :: JournalEntry)
-    seq = copy(reference)
-
-    ## Check on the DeltaType
+function _apply_entry!(seq :: LongDNA{4}, entry :: JournalEntry)
     if entry.delta_type == DeltaTypeDel
-        seq = delete_at!(seq,
-                         entry.position:(entry.position + 
-                             entry.data - 1))  # Data is the bound of the range
+        # `data` is the number of bases to delete, starting at `position`.
+        return delete_at!(seq, entry.position:(entry.position + entry.data - 1))
     elseif entry.delta_type == DeltaTypeIns
-        seq = insert!(seq, entry.position, LongDNA{4}(entry.data))
-
+        return insert!(seq, entry.position, LongDNA{4}(entry.data))
     elseif entry.delta_type == DeltaTypeSnp
-        ## Single nucleotide permutationa
-        seq[entry.position] = convert(DNA, entry.data)  
-
+        seq[entry.position] = convert(DNA, entry.data)
+        return seq
     elseif entry.delta_type == DeltaTypeSV
-        ## Larger Structure change
-        seq = structure_variation!(seq, entry.position, entry.data)
+        return structure_variation!(seq, entry.position, entry.data)
     elseif entry.delta_type == DeltaTypeCNV
-        seq = copy_number_variation!(seq, entry.position, entry.data)
+        return copy_number_variation!(seq, entry.position, entry.data)
+    else
+        error("Unsupported delta type $(entry.delta_type)")
     end
-    return seq
+end
+
+function apply_delta(reference :: LongDNA{4}, entry :: JournalEntry)
+    return _apply_entry!(copy(reference), entry)
 end
 
 
@@ -628,24 +600,8 @@ Apply multiple deltas to a sequence.
 function apply_delta(reference :: LongDNA{4}, delta :: DeltaMap)
 
     seq = copy(reference)
-    for (_, entry) in delta 
-        ## Check on the DeltaType
-        if entry.delta_type == DeltaTypeDel
-            seq = delete_at!(seq, entry.position:(entry.position + 
-            entry.data - 1))  # Data is the bound of the range
-        elseif entry.delta_type == DeltaTypeIns
-            seq = insert!(seq, entry.position, LongDNA{4}(entry.data))
-        elseif entry.delta_type == DeltaTypeSnp
-            ## Single nucleotide permutation
-
-            seq[entry.position] = convert(DNA, entry.data)  
-
-        elseif entry.delta_type == DeltaTypeSV
-            ## Larger Structure change
-            seq = structure_variation!(seq, entry.position, entry.data)
-        elseif entry.delta_type == DeltaTypeCNV
-            seq = copy_number_variation!(seq, entry.position, entry.data)
-        end
+    for (_, entry) in delta
+        seq = _apply_entry!(seq, entry)
     end
     return seq
 end

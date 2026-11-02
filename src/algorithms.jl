@@ -16,11 +16,23 @@ Find all approximate matches of a query in a DNA sequence.
 function approximate_findall(query, tolerance :: Int64, seq :: LongDNA{4})
     results = UnitRange{Int64}[]
     pos = findfirst(query, tolerance, seq)
-    while pos !== nothing
+    # An error budget that covers the whole query comes back as an empty
+    # range. Stop there instead of calling `last` on it.
+    while pos !== nothing && !isempty(pos)
         push!(results, pos)
         pos = findnext(query, tolerance, seq, last(pos)+tolerance+1)
     end
     return results
+end
+
+"""
+Sort hit ranges and drop duplicates. `Set` iteration order is not part of
+the search result, so callers can compare results across Julia versions.
+"""
+function _stable_ranges(ranges)
+    unique_ranges = collect(Set{UnitRange{Int64}}(ranges))
+    sort!(unique_ranges, by = r -> (first(r), last(r)))
+    return unique_ranges
 end
 
 
@@ -43,7 +55,7 @@ function approximate_search(jss :: JournaledString, needle :: LongDNA{4})
     to_add = Set{UnitRange{Int64}}()
 
     for i in 1:length(jss.deltaMap)
-        indexMatrix[i] = vector
+        indexMatrix[i] = copy(vector)
     end
     
     for i in 1:length(jss.deltaMap)
@@ -67,7 +79,7 @@ function approximate_search(jss :: JournaledString, needle :: LongDNA{4})
         indexMatrix[i] = filter(x -> all(y -> x != y, to_remove),
                                 indexMatrix[i])
         append!(indexMatrix[i], to_add)
-        indexMatrix[i] = collect(Set(indexMatrix[i]))
+        indexMatrix[i] = _stable_ranges(indexMatrix[i])
     end
     return indexMatrix
 end
@@ -103,7 +115,7 @@ function approximate_search(jss :: JournaledString,
     to_add = Set{UnitRange{Int64}}()
 
     for i in 1:length(jss.deltaMap)
-        indexMatrix[i] = vector
+        indexMatrix[i] = copy(vector)
     end
 
     for i in 1:length(jss.deltaMap)
@@ -129,7 +141,7 @@ function approximate_search(jss :: JournaledString,
         indexMatrix[i] = filter(x -> all(y -> x != y, to_remove),
                                 indexMatrix[i])
         append!(indexMatrix[i], to_add)
-        indexMatrix[i] = collect(Set(indexMatrix[i]))
+        indexMatrix[i] = _stable_ranges(indexMatrix[i])
     end
     return indexMatrix
 end
@@ -270,7 +282,7 @@ function approximate_search(tree::JSTree, needle::LongDNA{4})
         end
 
         # Finalize results for this sequence
-        results[i] = sort!(collect(results_set[i]), by=first)
+        results[i] = _stable_ranges(results_set[i])
     end
 
     return results
@@ -351,7 +363,7 @@ function approximate_search(tree::JSTree, needle::LongDNA{4}, tol::Int64)
         end
 
         # Finalize results for this sequence
-        results[i] = sort!(collect(results_set[i]), by=first)
+        results[i] = _stable_ranges(results_set[i])
     end
 
     return results

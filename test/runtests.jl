@@ -111,6 +111,29 @@ Sequence 10: AGATCGAGCGAGCTAGCGACTCAG"
     remove_delta!(tree1, 1)
     @test delta_count(tree1) == 4
 
+    kept = JournaledString(reference_seq, DeltaMap(1), 0)
+    add_delta!(kept, [1], DeltaTypeIns, 1, "AA")
+    add_delta!(kept, [1], DeltaTypeIns, 2, "CC")
+    remove_delta!(kept, 1, 0)
+    @test collect(keys(kept.deltaMap[1])) == [Timestamp(1)]
+
+    same_payload = JSTree(reference_seq, 2)
+    template = JournalEntry(DeltaTypeIns, 2, "TT", 0)
+    add_delta!(same_payload, [1], template)
+    add_delta!(same_payload, [2], template)
+    @test delta_count(same_payload) == 2
+
+    different_edit = JSTree(reference_seq, 2)
+    add_delta!(different_edit, [1], DeltaTypeSnp, 1, 'A')
+    @test is_equal(same_payload, different_edit) == false
+
+    left = JSTree(reference_seq, 2)
+    right = JSTree(reference_seq, 2)
+    add_delta!(left, [1], DeltaTypeSnp, 1, 'A')
+    add_delta!(right, [1], DeltaTypeSnp, 1, 'T')
+    @test left.current_time == right.current_time
+    @test is_equal(left, right) == false
+
     ## end Test of removal
 
 
@@ -132,8 +155,8 @@ Sequence 10: AGATCGAGCGAGCTAGCGACTCAG"
     )
 
     test_return3= Dict(
-        1 => [16:18, 13:15, 20:23, 9:11],
-        2 => [16:18, 13:15, 20:23, 9:11],
+        1 => [9:11, 13:15, 16:18, 20:23],
+        2 => [9:11, 13:15, 16:18, 20:23],
         3 => [8:11, 13:15],
         4 => [8:11, 13:15],
         5 => [8:11, 13:15],
@@ -189,12 +212,13 @@ Sequence 10: AGATCGAGCGAGCTAGCGACTCAG"
 
 
     ## Testing for Errors
-    #= RE-DO
-    @test_throws ErrorException add_node(tree2, "child18", deltaMap[2] , "child2")
-    @test_throws ErrorException remove_node!(tree1, "child18")
-    @test_throws ErrorException remove_node!(tree1, "root")
-    @test_throws ErrorException approximate_search(js1, needle, 115) == test_return
-    =#
+
+    @test_throws ErrorException approximate_search(js1, needle, 0)
+    @test_throws ErrorException approximate_search(js1, needle, 100)
+    @test_throws ErrorException approximate_search(test_tree, needle, 115)
+    # A budget that covers the whole 4-mer used to call `last` on an empty range.
+    @test approximate_search(js1, needle2, 99) isa Dict
+
     ## end Testing for Errors
 
     ## "Testing" the prints and APIs to update the code coverage
@@ -239,20 +263,28 @@ Sequence 10: AGATCGAGCGAGCTAGCGACTCAG"
     
     ioTestDict = Dict("Try1" => reference_seq)
     mktemp() do path, io
+        close(io)
         write_fasta(ioTestDict, path)
         @test_throws ErrorException load_fasta("InvalidPATH.!/")
-        close(io)
         ioTestDict2 = load_fasta(path)
         @test ioTestDict == ioTestDict2
     end
 
     ioTestDict3 = Dict("Try2" => (reference_seq, "!A5@DECC>GID<7?BEGC?=:7!"))
     mktemp() do path, io
+        close(io)
         write_fastq(ioTestDict3, path)
         @test_throws ErrorException load_fastq("InvalidPATH.!/")
-        close(io)
         ioTestDict4 = load_fastq(path)
-        @test [x[1] for (id, x) in ioTestDict3] == [x[1] for (id, x) in ioTestDict4]
+        @test ioTestDict3 == ioTestDict4
+    end
+
+    gzpath = tempname() * ".gz"
+    try
+        write_fastq(ioTestDict3, gzpath)
+        @test load_fastq(gzpath) == ioTestDict3
+    finally
+        rm(gzpath, force = true)
     end
     
     ## End Test of IO functions

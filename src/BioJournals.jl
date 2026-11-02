@@ -62,9 +62,7 @@ export DeltaType,
     load_fastq,
     write_fastq,
 
-    print_position_node,
     build_tree!,
-    print_tree2,
     _print_node,
     delta_count
     

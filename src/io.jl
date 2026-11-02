@@ -19,15 +19,18 @@ function load_fasta(filename)
     if !isfile(filename)
         error("File '$filename' does not exist.")
     end
-    
+
     seqs = Dict{String, LongDNA{4}}()
-    reader = open(FASTA.Reader, filename)
-    for record in reader
-        id = String(FASTX.identifier(record))
-        seq = LongDNA{4}(FASTX.sequence(record))
-        seqs[id] = seq
+    reader = FASTA.Reader(open(filename))
+    try
+        for record in reader
+            id = String(FASTX.identifier(record))
+            seq = LongDNA{4}(FASTX.sequence(String, record))
+            seqs[id] = seq
+        end
+    finally
+        close(reader)
     end
-    close(reader)
     return seqs
 end
 
@@ -42,21 +45,23 @@ Creates a new file if `filename` does not exist.
    - `filename`: Path to the output FASTA file.
 """
 function write_fasta(sequences :: Dict{String, LongDNA{4}}, filename :: String)
-    open(filename, "w") do io
-        writer = FASTA.Writer(io, 70) 
+    writer = FASTA.Writer(open(filename, "w"); width = 70)
+    try
         for (id, seq) in sequences
-            record = FASTA.Record(id, seq)
-            write(writer, record)
+            write(writer, FASTA.Record(id, String(seq)))
         end
+    finally
         close(writer)
     end
+    return nothing
 end
 
 
 """
 Writes records to a FASTQ file.
 
-Creates a new file if `filename` does not exist.
+Creates a new file if `filename` does not exist. A filename ending in `.gz`
+is written through a gzip stream.
 
 # Args:
    - `records`: A dictionary mapping sequence IDs to tuples of `LongDNA{4}`
@@ -65,52 +70,44 @@ Creates a new file if `filename` does not exist.
 """
 function write_fastq(records :: Dict{String, Tuple{LongDNA{4}, String}},
                      filename :: String)
-    io = endswith(filename, ".gz") ? 
-        GzipCompressorStream(open(filename, "w")) : 
+    io = endswith(filename, ".gz") ?
+        GzipCompressorStream(open(filename, "w")) :
         open(filename, "w")
-
+    writer = FASTQ.Writer(io; quality_header = true)
     try
-        writer = FASTQ.Writer(io, true)
         for (id, (seq, qual)) in records
-
-            seq_str = String(seq) 
-            qual_str = String(qual)
-
             if occursin(r"[\n\r]", id)
                 error("ID contains newline characters: ", repr(id))
             end
 
-            if length(seq_str) != length(qual_str)
+            seq_str = String(seq)
+            qual_str = String(qual)
+            if ncodeunits(seq_str) != ncodeunits(qual_str)
                 error("""
                         Length mismatch in record $(repr(id)):
-                        - Sequence: $(length(seq_str)) bases
-                        - Quality: $(length(qual_str)) chars
+                        - Sequence: $(ncodeunits(seq_str)) bases
+                        - Quality: $(ncodeunits(qual_str)) chars
                       """)
             end
-
-            record_data = Vector{UInt8}()
-            append!(record_data, "@", id, "\n")
-            append!(record_data, seq_str, "\n+\n")
-            append!(record_data, qual_str, "\n")
-
-            record = FASTQ.Record(record_data)
-            write(writer, record)
+            write(writer, FASTQ.Record(id, seq_str, qual_str))
         end
-        close(writer)
     finally
-        close(io)
+        close(writer)
     end
+    return nothing
 end
 
 
 """
 Loads records from a FASTQ file into a dictionary.
 
+A filename ending in `.gz` is read through a gzip stream.
+
 # Args:
    - `filename`: Path to the FASTQ file.
 
 # Returns:
-   - A dictionary mapping sequence IDs to tuples of `LongDNA{4}` sequences 
+   - A dictionary mapping sequence IDs to tuples of `LongDNA{4}` sequences
      and their quality scores.
 
 # Raises:
@@ -121,19 +118,19 @@ function load_fastq(filename :: String)
         error("File '$filename' does not exist.")
     end
     records = Dict{String, Tuple{LongDNA{4}, String}}()
-    io = endswith(filename, ".gz") ? 
-    GzipDecompressorStream(open(filename, "r")) : open(filename, "r")
+    io = endswith(filename, ".gz") ?
+        GzipDecompressorStream(open(filename, "r")) :
+        open(filename, "r")
+    reader = FASTQ.Reader(io)
     try
-        reader = FASTQ.Reader(io)
         for record in reader
             id = String(FASTX.identifier(record))
-            seq = LongDNA{4}(FASTX.sequence(record))
+            seq = LongDNA{4}(FASTX.sequence(String, record))
             qual = String(FASTX.quality(record))
             records[id] = (seq, qual)
         end
-        close(reader)
     finally
-        close(io)
+        close(reader)
     end
     return records
 end

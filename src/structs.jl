@@ -5,18 +5,20 @@
 """
 Represents a time stamp tagging a given "change".
 
-The time stamp is a `primitive` type, `Unisigned 64`.
+The time stamp is a primitive type, stored as an unsigned 64-bit integer.
 """
 primitive type Timestamp <: Unsigned 64 end
 
-Timestamp(x :: UInt8)  = reinterpret(Timestamp, x)
-Timestamp(x :: UInt16) = reinterpret(Timestamp, x)
-Timestamp(x :: UInt32) = reinterpret(Timestamp, x)
-Timestamp(x :: UInt64) = reinterpret(Timestamp, x)
-Timestamp(x::Unsigned) = reinterpret(Timestamp, x)
-Timestamp(x::Int) = reinterpret(Timestamp, x)
+# `reinterpret` requires identical width, so every other integer converts
+# through `UInt64` first.
+Timestamp(x::UInt64) = reinterpret(Timestamp, x)
+function Timestamp(x::Integer)
+    x < 0 && throw(DomainError(x, "Timestamp must be non-negative"))
+    return Timestamp(UInt64(x))
+end
 
-UInt64(ts::Timestamp) = reinterpret(UInt64, ts)
+Base.UInt64(ts::Timestamp) = reinterpret(UInt64, ts)
+Base.convert(::Type{Timestamp}, x::Integer) = Timestamp(x)
 Base.convert(::Type{Int64}, ts::Timestamp) = reinterpret(Int64, ts)
 addto(ts::Timestamp, x::Unsigned) = Timestamp(UInt64(ts) + x)
 addto(ts::Timestamp, x::Timestamp) = Timestamp(UInt64(ts) + UInt64(x))
@@ -25,15 +27,17 @@ Base.:+(ts::Timestamp, n::Unsigned) = Timestamp(UInt64(ts) + n)
 Base.:+(ts::Timestamp, n::UInt64) = Timestamp(UInt64(ts) + n)
 
 Base.:(==)(a::Timestamp, b::Timestamp) = UInt64(a) == UInt64(b)
+Base.isequal(a::Timestamp, b::Timestamp) = UInt64(a) == UInt64(b)
 Base.hash(ts::Timestamp, h::UInt64) = hash(UInt64(ts), h)
+Base.isless(a::Timestamp, b::Timestamp) = UInt64(a) < UInt64(b)
 
-Base.:(<)(a::Timestamp, b::Timestamp) = UInt64(a) < UInt64(b)
-Base.:(==)(ts::Timestamp, x::Integer) = UInt64(ts) == convert(UInt64, x)
+Base.:(<)(a::Timestamp, b::Timestamp) = isless(a, b)
+Base.:(==)(ts::Timestamp, x::Integer) = x >= 0 && UInt64(ts) == UInt64(x)
 Base.:(==)(x::Integer, ts::Timestamp) = ts == x
-Base.:(<)(ts::Timestamp, x::Integer) = UInt64(ts) < convert(UInt64, x)
-Base.:(<)(x::Integer, ts::Timestamp) = convert(UInt64, x) < UInt64(ts)
-Base.:<=(ts::Timestamp, x::Integer) = UInt64(ts) <= convert(UInt64, x)
-Base.:<=(x::Integer, ts::Timestamp) = convert(UInt64, x) <= UInt64(ts)
+Base.:(<)(ts::Timestamp, x::Integer) = x >= 0 && UInt64(ts) < UInt64(x)
+Base.:(<)(x::Integer, ts::Timestamp) = x < 0 || UInt64(x) < UInt64(ts)
+Base.:<=(ts::Timestamp, x::Integer) = x >= 0 && UInt64(ts) <= UInt64(x)
+Base.:<=(x::Integer, ts::Timestamp) = x < 0 || UInt64(x) <= UInt64(ts)
 
 Base.show(io::IO, ts::Timestamp) = show(io, UInt64(ts))
 Base.print(io::IO, ts::Timestamp) = print(io, repr(UInt64(ts)))
@@ -153,7 +157,6 @@ mutable struct JSTree
 end
 
 function JSTree(root::LongDNA{4}, default_length::Int)
-    journal = SortedDict{Int64, Dict{Int64, JournalEntry}}()
     return JSTree(
         root,
         JSTNode[],
