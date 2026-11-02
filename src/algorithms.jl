@@ -1,372 +1,261 @@
 ### -*- Mode: Julia -*-
 
 ### algorithms.jl
+#
+# Exact and approximate search share one path. The reference is scanned
+# once. Sequences with no edits reuse those hits. Sequences with edits keep
+# the hits that no edit touches, mapped into the edited coordinate system,
+# and rescan only a window around each edit wide enough to contain every
+# new or broken match.
 
-"""
-Find all approximate matches of a query in a DNA sequence.
-
-# Args:
-   - `query`: The search query.
-   - `tolerance`: Allowed mismatch percentage.
-   - `seq`: The LongDNA{4} sequence to search in.
-
-# Returns:
-   - A vector of UnitRanges representing match positions.
-"""
-function approximate_findall(query, tolerance :: Int64, seq :: LongDNA{4})
+function approximate_findall(query, tolerance :: Int, seq :: LongDNA{4})
     results = UnitRange{Int64}[]
     pos = findfirst(query, tolerance, seq)
-    # An error budget that covers the whole query comes back as an empty
-    # range. Stop there instead of calling `last` on it.
     while pos !== nothing && !isempty(pos)
         push!(results, pos)
-        pos = findnext(query, tolerance, seq, last(pos)+tolerance+1)
+        pos = findnext(query, tolerance, seq, last(pos) + tolerance + 1)
     end
     return results
 end
 
-"""
-Sort hit ranges and drop duplicates. `Set` iteration order is not part of
-the search result, so callers can compare results across Julia versions.
-"""
-function _stable_ranges(ranges)
-    unique_ranges = collect(Set{UnitRange{Int64}}(ranges))
-    sort!(unique_ranges, by = r -> (first(r), last(r)))
-    return unique_ranges
+function _check_tolerance(tol :: Integer)
+    1 <= tol <= 99 ||
+        throw(ArgumentError("tolerance must be between 1 and 99 percent, got $tol"))
+    return nothing
 end
 
+_error_budget(needle, tol :: Integer) = ceil(Int, length(needle) * tol / 100)
 
-"""
-Perform approximate search in a JournaledString.
-
-# Args: 
-   - `jss`: The JournaledString to search in. 
-   - `needle`: The LongDNA{4} sequence to find.
-
-# Returns: 
-   - A dictionary mapping time points to match ranges.
-"""
-function approximate_search(jss :: JournaledString, needle :: LongDNA{4})
-    query = ApproximateSearchQuery(needle)
-    tolerance = ceil(Int64, (length(needle) / 100) * 5)  
-    indexMatrix = Dict{Int64, Vector{UnitRange{Int64}}}()
-    vector = approximate_findall(query, tolerance, jss.reference)
-    to_remove = Set{UnitRange{Int64}}()
-    to_add = Set{UnitRange{Int64}}()
-
-    for i in 1:length(jss.deltaMap)
-        indexMatrix[i] = copy(vector)
+function _edit_touches_span(entry :: JournalEntry, span :: UnitRange{Int}, ref_len :: Int)
+    position = entry.position
+    payload = entry.payload
+    if payload isa Substitution
+        return first(span) <= position <= last(span)
+    elseif payload isa Deletion
+        return position <= last(span) && position + payload.len - 1 >= first(span)
+    elseif payload isa StructuralVariant && position >= ref_len
+        return last(span) == ref_len
+    else
+        # An insertion anchored at the first base of the span sits in front of
+        # it and only shifts the hit. An anchor inside the span rewrites it.
+        return first(span) < position <= last(span)
     end
-    
-    for i in 1:length(jss.deltaMap)
-        empty!(to_add)
-        empty!(to_remove)
-        for range in indexMatrix[i]
-            for ( _, entry) in jss.deltaMap[i]
-                
-                if entry.position in range
-                    seq = apply_delta(jss.reference, entry)
+end
 
-                    for element in approximate_findall(query, tolerance, seq)
-                        push!(to_add, element)
-                    end
-                    
-                    push!(to_remove, range)
-                end
+function _span_affected(span :: UnitRange{Int}, edits, ref_len :: Int)
+    for entry in edits
+        _edit_touches_span(entry, span, ref_len) && return true
+    end
+    return false
+end
 
-            end
+"""Map a reference interval that no edit rewrites into the edited sequence."""
+function _project_span(span :: UnitRange{Int}, edits, ref_len :: Int)
+    start = _ref_base_pos(edits, first(span), ref_len)
+    stop = _ref_base_pos(edits, last(span), ref_len)
+    return Int64(start):Int64(stop)
+end
+
+function _occupied_range(entry :: JournalEntry, edits, ref_len :: Int, seq_len :: Int)
+    payload = entry.payload
+    if payload isa StructuralVariant && entry.position >= ref_len
+        tail = _terminal_tail(edits, ref_len)
+        return max(1, seq_len - tail + 1):seq_len
+    end
+    if _anchor_deleted(edits, entry.position) && !(payload isa Deletion)
+        return 1:0
+    end
+    if payload isa Deletion
+        next_ref = entry.position + payload.len
+        junction = next_ref <= ref_len ?
+                   _ref_base_pos(edits, next_ref, ref_len) :
+                   _ref_base_pos(edits, ref_len, ref_len) + 1
+        return junction:junction
+    elseif payload isa Substitution
+        base = _ref_base_pos(edits, entry.position, ref_len)
+        return base:base
+    else
+        base = _ref_base_pos(edits, entry.position, ref_len)
+        lead = _anchor_insert_len(edits, entry.position, ref_len)
+        start = base - lead
+        stop = base - 1
+        return start <= stop ? (start:stop) : (base:base)
+    end
+end
+
+function _terminal_tail(edits, ref_len :: Int)
+    total = 0
+    for entry in edits
+        payload = entry.payload
+        payload isa StructuralVariant || continue
+        entry.position >= ref_len || continue
+        total += length(payload.seq) + (entry.position - ref_len)
+    end
+    return total
+end
+
+function _search_window(occupied :: UnitRange{Int}, context :: Int, seq_len :: Int)
+    isempty(occupied) && return 1:0
+    lo = max(1, first(occupied) - context + 1)
+    hi = min(seq_len, last(occupied) + context - 1)
+    return lo <= hi ? (lo:hi) : (1:0)
+end
+
+"""
+Keep the same matches a left-to-right scanner would report.
+`resume` is how many bases after the end of a hit the next search may start.
+Exact search uses 1. Approximate search uses `tolerance + 1`.
+"""
+function _greedy_hits(candidates, resume :: Int)
+    ordered = sort!(collect(Set{UnitRange{Int64}}(candidates)); by = r -> (first(r), last(r)))
+    kept = UnitRange{Int64}[]
+    next_ok = 1
+    for hit in ordered
+        first(hit) < next_ok && continue
+        push!(kept, hit)
+        next_ok = last(hit) + resume
+    end
+    return kept
+end
+
+function _hits_on_sequence(search_window! :: Function,
+                           reference :: LongDNA{4},
+                           edits,
+                           all_ref_hits,
+                           clean_hits,
+                           context :: Int,
+                           resume :: Int)
+    isempty(edits) && return copy(clean_hits)
+    ref_len = length(reference)
+    seq = apply_delta(reference, edits)
+    candidates = UnitRange{Int64}[]
+    for span in all_ref_hits
+        _span_affected(span, edits, ref_len) && continue
+        projected = _project_span(span, edits, ref_len)
+        length(projected) == length(span) && push!(candidates, projected)
+    end
+    seq_len = length(seq)
+    seen = Set(candidates)
+    for entry in edits
+        occupied = _occupied_range(entry, edits, ref_len, seq_len)
+        window = _search_window(occupied, context, seq_len)
+        isempty(window) && continue
+        search_window!(candidates, seen, seq, window)
+    end
+    return _greedy_hits(candidates, resume)
+end
+
+function _exact_window!(hits, seen, seq, window, query)
+    offset = first(window) - 1
+    for match in _all_exact(query, seq[window])
+        hit = Int64(first(match) + offset):Int64(last(match) + offset)
+        if hit ∉ seen
+            push!(seen, hit)
+            push!(hits, hit)
         end
-        indexMatrix[i] = filter(x -> all(y -> x != y, to_remove),
-                                indexMatrix[i])
-        append!(indexMatrix[i], to_add)
-        indexMatrix[i] = _stable_ranges(indexMatrix[i])
     end
-    return indexMatrix
+    return nothing
 end
 
-
-"""
-Perform approximate search in a JournaledString with tolerance.
-
-# Args:
-   - `jss`: The JournaledString to search in.
-   - `needle`: The LongDNA{4} sequence to find.
-   - `tol`: Allowed mismatch percentage (1-99%).
-
-# Returns:
-   - A dictionary mapping time points to match ranges.
-
-# Errors:
-   - Throws an error if tolerance is ≤0% or ≥100%.
-"""
-function approximate_search(jss :: JournaledString,
-                            needle :: LongDNA{4},
-                            tol :: Int64)
-
-    if tol <= 0 || tol >= 100
-        error("Tolerance cannot less or 0% or more than 100%")
+function _approx_window!(hits, seen, seq, window, query, budget)
+    offset = first(window) - 1
+    for match in _all_approx(query, budget, seq[window])
+        hit = Int64(first(match) + offset):Int64(last(match) + offset)
+        if hit ∉ seen
+            push!(seen, hit)
+            push!(hits, hit)
+        end
     end
-
-    tolerance = ceil(Int64, (length(needle) / 100) * tol) 
-    query = ApproximateSearchQuery(needle)
-    indexMatrix = Dict{Int64, Vector{UnitRange{Int64}}}()
-    vector = approximate_findall(query, tolerance, jss.reference)
-    to_remove = Set{UnitRange{Int64}}()
-    to_add = Set{UnitRange{Int64}}()
-
-    for i in 1:length(jss.deltaMap)
-        indexMatrix[i] = copy(vector)
-    end
-
-    for i in 1:length(jss.deltaMap)
-        empty!(to_add)
-        empty!(to_remove)
-        for range in indexMatrix[i]
-            
-            for ( time, entry) in jss.deltaMap[i]
-                    
-                if entry.position in range
-                    seq = apply_delta(jss.reference, entry)
-
-                    for element in approximate_findall(query, tolerance, seq)
-                        push!(to_add, element)
-                    end
-                        
-                    push!(to_remove, range)
-                end
-
-            end
-
-        end 
-        indexMatrix[i] = filter(x -> all(y -> x != y, to_remove),
-                                indexMatrix[i])
-        append!(indexMatrix[i], to_add)
-        indexMatrix[i] = _stable_ranges(indexMatrix[i])
-    end
-    return indexMatrix
+    return nothing
 end
 
+function _sequence_count(js :: JournaledString)
+    return length(js.deltaMap)
+end
 
-"""
-Perform exact search in a JournaledString.
+function _sequence_count(tree :: JSTree)
+    return tree.length
+end
 
-# Args:
-   - `jss`: The JournaledString to search in.
-   - `needle`: The LongDNA sequence to find.
+function _reference_of(js :: JournaledString)
+    return js.reference
+end
 
-# Returns:
-   - A dictionary mapping time points to exact match ranges.
-"""
-function exact_search(jss :: JournaledString, needle :: LongDNA )
-    results = Dict(i => UnitRange{Int64}[] for i in 1:length(jss.deltaMap))
+function _reference_of(tree :: JSTree)
+    return tree.root
+end
+
+function _all_exact(query, seq :: LongDNA{4})
+    hits = UnitRange{Int64}[]
+    pos = findfirst(query, seq)
+    while pos !== nothing && !isempty(pos)
+        push!(hits, pos)
+        nxt = first(pos) + 1
+        nxt > lastindex(seq) && break
+        pos = findnext(query, seq, nxt)
+    end
+    return hits
+end
+
+function exact_search(journal, needle :: LongDNA)
+    reference = _reference_of(journal)
     query = ExactSearchQuery(needle)
-    vector = UnitRange{Int64}[]
-        for i in 1:length(jss.deltaMap)
-
-            seq = apply_delta(jss.reference, jss.deltaMap[i])
-            vector = BioSequences.findall(query, seq)
-            append!(results[i], vector)
-
+    clean_hits = collect(BioSequences.findall(query, reference))
+    all_hits = _all_exact(query, reference)
+    n = _sequence_count(journal)
+    context = max(length(needle), 1)
+    results = Dict{Int64, Vector{UnitRange{Int64}}}()
+    for index in 1:n
+        edits = edits_at(journal, index)
+        results[index] = _hits_on_sequence(
+            reference, edits, all_hits, clean_hits, context, 1) do hits, seen, seq, window
+            _exact_window!(hits, seen, seq, window, query)
         end
-    return results
-end
-
-
-"""
-Perform exact search in a Journaled String Tree (JST).
-
-# Args: 
-   - `jst`: The JSTree to search in. 
-   - `needle`: The LongDNA{4} sequence to find.
-
-# Returns: 
-   - A dictionary mapping node names to exact match ranges.
-"""
-function exact_search(tree::JSTree, needle::LongDNA{4})
-    # prepare a dict of result‐vectors for each sequence index
-    results = Dict(i => UnitRange{Int64}[] for i in 1:tree.length)
-    # build the exact‐search query once
-    query = ExactSearchQuery(needle)
-
-    # for each “leaf” sequence index...
-    for i in 1:tree.length
-        # start from the root sequence
-        seq = copy(tree.root)
-
-        # apply every delta in ascending position order
-        for (pos, buckets) in tree.journal
-            for bucket in buckets
-                # if this bucket has a mutation for index i, apply it
-                if haskey(bucket, Int64(i))
-                    entry = bucket[Int64(i)]
-                    seq = apply_delta(seq, entry)
-                end
-            end
-        end
-
-        # now search the fully reconstructed seq for exact matches
-        matches = BioSequences.findall(query, seq)
-        append!(results[i], matches)
     end
-
     return results
 end
 
 """
-Perform approximate search in a Journaled String Tree (JST).
+    approximate_search(journal, needle, tol=5) -> Dict{Int, Vector{UnitRange{Int}}}
 
-# Args:
-   - `jst`: The JSTree to search in.
-   - `needle`: The LongDNA{4} sequence to find.
+Find `needle` in every sequence of a `JournaledString` or `JSTree`.
 
-# Returns:
-    A dictionary mapping node names to match ranges.
+`tol` is the allowed mismatch percentage, from 1 through 99. The default
+is 5. Hits are sorted and unique.
 """
-
-function approximate_search(tree::JSTree, needle::LongDNA{4})
-
-    tol = ceil(Int64, (length(needle) / 100) * 5) 
+function approximate_search(journal, needle :: LongDNA, tol :: Integer = 5)
+    _check_tolerance(tol)
+    reference = _reference_of(journal)
+    budget = _error_budget(needle, tol)
     query = ApproximateSearchQuery(needle)
-
-    # Initial root matches
-    root_hits = approximate_findall(query, tol, tree.root)
-    results = Dict(i => copy(root_hits) for i in 1:tree.length)
-    results_set = Dict(i => Set(root_hits) for i in 1:tree.length)
-
-    # Collect journal positions once (outside sequence loop)
-    journal_positions = collect(keys(tree.journal))
-    sort!(journal_positions)  # Ensure processing in position order
-
-    for i in 1:tree.length
-        applied = false
-        current_seq = nothing
-        current_positions = copy(journal_positions)  # Positions to process for this sequence
-
-        # Process journal entries in position order
-        for pos in current_positions
-            buckets = tree.journal[pos]
-            for bucket in buckets
-                if haskey(bucket, Int64(i))
-                    entry = bucket[Int64(i)]
-                    # Check if this entry affects existing hits
-                    hit_ranges = collect(results_set[i])
-                    invalid = [r for r in hit_ranges if entry.position in r]
-
-                    if !isempty(invalid)
-                        if !applied
-                            # Initialize sequence with root only once
-                            current_seq = copy(tree.root)
-                            results_set[i] = Set()
-                            applied = true
-                        end
-
-                        # Remove invalidated ranges
-                        for r in invalid
-                            delete!(results_set[i], r)
-                        end
-
-                        # Apply mutation and get new hits
-                        current_seq = apply_delta(current_seq, entry)
-                        new_hits = approximate_findall(query, tol, current_seq)
-                        
-                        # Add new hits and break out after applying mutation
-                        for newr in new_hits
-                            push!(results_set[i], newr)
-                        end
-                        
-                        # BREAK AFTER APPLYING MUTATION
-                        break  # Exit bucket loop after applying mutation
-                    end
-                end
-            end
+    clean_hits = approximate_findall(query, budget, reference)
+    all_hits = _all_approx(query, budget, reference)
+    n = _sequence_count(journal)
+    # Indels inside an approximate hit can extend it by `budget` bases.
+    context = max(length(needle) + 2 * budget, 1)
+    resume = budget + 1
+    results = Dict{Int64, Vector{UnitRange{Int64}}}()
+    for index in 1:n
+        edits = edits_at(journal, index)
+        results[index] = _hits_on_sequence(
+            reference, edits, all_hits, clean_hits, context, resume) do hits, seen, seq, window
+            _approx_window!(hits, seen, seq, window, query, budget)
         end
-
-        # Finalize results for this sequence
-        results[i] = _stable_ranges(results_set[i])
     end
-
     return results
 end
 
-"""
-Perform approximate search in a Journaled String Tree (JST) with tolerance.
-
-# Args:
-   - `jss`: The JournaledString to search in.
-   - `needle`: The LongDNA{4} sequence to find.
-   - `tol`: Allowed mismatch percentage (1-99%).
-
-# Returns:
-   - A dictionary mapping time points to match ranges.
-
-# Errors:
-   - Throws an error if tolerance is ≤0% or ≥100%.
-"""
-function approximate_search(tree::JSTree, needle::LongDNA{4}, tol::Int64)
-    if tol <= 0 || tol >= 100
-        error("Tolerance cannot less or 0% or more than 100%")
+"""Every approximate hit, including ones the public scanner skips as overlaps."""
+function _all_approx(query, budget :: Int, seq :: LongDNA{4})
+    hits = UnitRange{Int64}[]
+    pos = findfirst(query, budget, seq)
+    while pos !== nothing && !isempty(pos)
+        push!(hits, pos)
+        nxt = first(pos) + 1
+        nxt > lastindex(seq) && break
+        pos = findnext(query, budget, seq, nxt)
     end
-    tolerance = ceil(Int64, (length(needle) / 100) * tol) 
-    query = ApproximateSearchQuery(needle)
-
-    # Initial root matches
-    root_hits = approximate_findall(query, tolerance, tree.root)
-    results = Dict(i => copy(root_hits) for i in 1:tree.length)
-    results_set = Dict(i => Set(root_hits) for i in 1:tree.length)
-
-    # Collect journal positions once (outside sequence loop)
-    journal_positions = collect(keys(tree.journal))
-    sort!(journal_positions)  # Ensure processing in position order
-
-    for i in 1:tree.length
-        applied = false
-        current_seq = nothing
-        current_positions = copy(journal_positions)  # Positions to process for this sequence
-
-        # Process journal entries in position order
-        for pos in current_positions
-            buckets = tree.journal[pos]
-            for bucket in buckets
-                if haskey(bucket, Int64(i))
-                    entry = bucket[Int64(i)]
-                    # Check if this entry affects existing hits
-                    hit_ranges = collect(results_set[i])
-                    invalid = [r for r in hit_ranges if entry.position in r]
-
-                    if !isempty(invalid)
-                        if !applied
-                            # Initialize sequence with root only once
-                            current_seq = copy(tree.root)
-                            results_set[i] = Set()
-                            applied = true
-                        end
-
-                        # Remove invalidated ranges
-                        for r in invalid
-                            delete!(results_set[i], r)
-                        end
-
-                        # Apply mutation and get new hits
-                        current_seq = apply_delta(current_seq, entry)
-                        new_hits = approximate_findall(query, tolerance, current_seq)
-                        
-                        # Add new hits and break out after applying mutation
-                        for newr in new_hits
-                            push!(results_set[i], newr)
-                        end
-                        
-                        # BREAK AFTER APPLYING MUTATION
-                        break  # Exit bucket loop after applying mutation
-                    end
-                end
-            end
-        end
-
-        # Finalize results for this sequence
-        results[i] = _stable_ranges(results_set[i])
-    end
-
-    return results
+    return hits
 end
 
 ### algorithms.jl ends here.

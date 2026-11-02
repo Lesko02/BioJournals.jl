@@ -141,7 +141,7 @@ function _print_node(node::JSTNode, indent::Int)
     # build a label from its delta dict
     first_e  = first(values(node.delta))
     pos      = first_e.position
-    idxs     = collect(keys(node.delta))
+    idxs     = sort!(collect(keys(node.delta)))
     dtype    = first_e.delta_type
     label    = "pos=$pos idxs=$(idxs) type=$(dtype)"
 
@@ -155,10 +155,12 @@ function _print_node(node::JSTNode, indent::Int)
 end
 
 # top-level: print each root child
-function print_tree(tree::JSTree)
+function print_tree(tree :: JSTree)
+    build_tree!(tree)
     for node in tree.rootChildren
         _print_node(node, 0)
     end
+    return nothing
 end
 
 """
@@ -256,21 +258,25 @@ Adds a delta to a JournaledString.
     julia> add_delta!(js, [1, 2], DeltaTypeIns, 3, "AC") 
 ```    
 """
+function _check_indices(n :: Integer, indices)
+    for idx in indices
+        1 <= idx <= n || throw(BoundsError(1:n, idx))
+    end
+    return nothing
+end
+
 function add_delta!(js :: JournaledString,
-                    indices :: Vector{Int}, 
+                    indices :: Vector{Int},
                     delta_type :: DeltaType,
                     position :: Int,
-                    data :: Any)
+                    data)
+    _check_indices(length(js.deltaMap), indices)
     for idx in indices
-        ## Create the new JournalEntry
         new_entry = JournalEntry(delta_type, position, data, js.current_time)
-
-        ## Insert the entry into the SortedDict with `time` as the key
         js.deltaMap[idx][js.current_time] = new_entry
-
-        ## Increment the current time
         js.current_time += UInt64(1)
     end
+    return nothing
 end
 
 """
@@ -286,7 +292,7 @@ function _matching_bucket!(buckets :: Vector{Dict{Int64, JournalEntry}},
     for bucket in buckets
         isempty(bucket) && continue
         entry = first(values(bucket))
-        if entry.delta_type == delta_type && entry.data == data
+        if entry.delta_type == delta_type && entry.payload == make_payload(delta_type, data)
             return bucket
         end
     end
@@ -301,31 +307,28 @@ Adds a delta to every listed sequence in a JSTree.
 Entries that share a position, delta type, and payload share one bucket,
 which `build_tree!` later turns into one branch.
 """
+function _insert_tree_entry!(tree :: JSTree, idx :: Integer, entry :: JournalEntry)
+    vec = get!(tree.journal, entry.position) do
+        Vector{Dict{Int64, JournalEntry}}()
+    end
+    bucket = _matching_bucket!(vec, entry.delta_type, entry.payload)
+    bucket[Int64(idx)] = entry
+    return nothing
+end
+
 function add_delta!(tree :: JSTree,
-                    indices :: Vector{Int}, 
+                    indices :: Vector{Int},
                     delta_type :: DeltaType,
                     position :: Int,
-                    data :: Any)
-
+                    data)
+    _check_indices(tree.length, indices)
     for idx in indices
-        # Create the new JournalEntry
-        new_entry = JournalEntry(delta_type, position, data, tree.current_time)
-
-        # Get or build bucket
-        vec = get!(tree.journal, Int64(position)) do
-            Vector{Dict{Int64,JournalEntry}}()
-        end
-        bucket = _matching_bucket!(vec, delta_type, data)
-
-        # Push entry
-        bucket[Int64(idx)] = new_entry
-
-        # Update clock
+        entry = JournalEntry(delta_type, position, data, tree.current_time)
+        _insert_tree_entry!(tree, idx, entry)
         tree.current_time += UInt64(1)
-
     end
-
-    
+    build_tree!(tree)
+    return nothing
 end
 
 """
@@ -341,27 +344,14 @@ with the tree's current_time (and then incrementing it).
 # Returns
 - `nothing`  : mutates `tree.journal` and `tree.current_time`
 """
-function add_delta!(tree::JSTree, indices::Vector{Int}, entry::JournalEntry)
-    pos = Int64(entry.position)
-
-    # grab or initialize the list of same‐kind buckets at this position
-    vec = get!(tree.journal, pos) do
-        Vector{Dict{Int64,JournalEntry}}()
-    end
-
-    bucket = _matching_bucket!(vec, entry.delta_type, entry.data)
-
-    # now insert one stamped entry per index
+function add_delta!(tree :: JSTree, indices :: Vector{Int}, entry :: JournalEntry)
+    _check_indices(tree.length, indices)
     for idx in indices
-        # create a fresh entry with the current tree clock
-        stamped = JournalEntry(entry.delta_type,
-                               entry.position,
-                               entry.data,
-                               tree.current_time)
-        bucket[Int64(idx)] = stamped
+        stamped = JournalEntry(entry.delta_type, entry.position, entry.payload, tree.current_time)
+        _insert_tree_entry!(tree, idx, stamped)
         tree.current_time += UInt64(1)
     end
-
+    build_tree!(tree)
     return nothing
 end
 
@@ -416,12 +406,15 @@ Adds a JournalEntry to indices.
 ```
 """
 function add_delta!(js :: JournaledString,
-                    indices :: Vector{Int}, 
+                    indices :: Vector{Int},
                     entry :: JournalEntry)
+    _check_indices(length(js.deltaMap), indices)
     for idx in indices
-        js.deltaMap[idx][js.current_time] = entry
+        stamped = JournalEntry(entry.delta_type, entry.position, entry.payload, js.current_time)
+        js.deltaMap[idx][js.current_time] = stamped
         js.current_time += UInt64(1)
     end
+    return nothing
 end
 
 
@@ -441,49 +434,21 @@ Removes a delta by time key.
 ```
 """
 function remove_delta!(js :: JournaledString, idx :: Int, time :: Integer)
+    _check_indices(length(js.deltaMap), (idx,))
     key = Timestamp(time)
     delta = js.deltaMap[idx]
     if !haskey(delta, key)
-        error("No mutation found at time: $time at index: $idx")
+        throw(ArgumentError("No mutation found at time: $time at index: $idx"))
     end
     delete!(delta, key)
     return nothing
 end
 
 """
-Removes a delta entry from a JSTree by time key.
+    remove_delta!(tree::JSTree, time)
 
-# Args:
-   - `tree`: The JSTree structure.
-   - `time`: Time key of the delta entry to remove.
-
-# Returns:
-   - `nothing` (modifies JSTree in place)
-
-# Throws:
-   - `ErrorException` if no matching delta is found.
-# Examples: 
-```julia-repl
-    julia> remove_delta!(jst, 5) 
-```
+Remove the journal entry stamped with `time` and rebuild the derived tree.
 """
-
-"""
-remove_delta!(tree::JSTree, time::Int)
-
-Remove the JournalEntry whose timestamp is `time` from a JSTree's journal.
-
-# Arguments:
-    - tree::JSTree   : the JSTree containing the journal
-    - time::Int       : the unique timestamp key of the entry to remove
-
-# Returns:
-    - nothing         : modifies `tree` in place
-
-#Throws:
-    - ErrorException  : if no entry with the given `time` exists
-"""
-
 function remove_delta!(tree::JSTree, time::Timestamp)
     found = false
     pos_to_clean = nothing
@@ -508,7 +473,7 @@ function remove_delta!(tree::JSTree, time::Timestamp)
     end
 
     if !found
-        error("No mutation found at time: $time")
+        throw(ArgumentError("No mutation found at time: $time"))
     end
 
     # Clean up empty structures
@@ -525,10 +490,11 @@ function remove_delta!(tree::JSTree, time::Timestamp)
             end
         end
     end
-
+    build_tree!(tree)
+    return nothing
 end
 
-remove_delta!(tree::JSTree, time::Integer) = remove_delta!(tree, Timestamp(time))
+remove_delta!(tree :: JSTree, time :: Integer) = remove_delta!(tree, Timestamp(time))
 
 """
 Count total deltas in journal (for testing)
@@ -541,69 +507,6 @@ function delta_count(tree::JSTree)
         end
     end
     return count
-end
-
-
-"""
-Apply a delta to a sequence.
-
-# Args:
-   - `reference`: LongDNA{4} reference sequence.
-   - `entry`: JournalEntry delta.
-
-# Returns:
-   - Modified LongDNA{4} sequence.
-
-# Examples:
-```julia-repl
-    julia> apply_delta(ref_seq, entry)
-```
-"""
-function _apply_entry!(seq :: LongDNA{4}, entry :: JournalEntry)
-    if entry.delta_type == DeltaTypeDel
-        # `data` is the number of bases to delete, starting at `position`.
-        return delete_at!(seq, entry.position:(entry.position + entry.data - 1))
-    elseif entry.delta_type == DeltaTypeIns
-        return insert!(seq, entry.position, LongDNA{4}(entry.data))
-    elseif entry.delta_type == DeltaTypeSnp
-        seq[entry.position] = convert(DNA, entry.data)
-        return seq
-    elseif entry.delta_type == DeltaTypeSV
-        return structure_variation!(seq, entry.position, entry.data)
-    elseif entry.delta_type == DeltaTypeCNV
-        return copy_number_variation!(seq, entry.position, entry.data)
-    else
-        error("Unsupported delta type $(entry.delta_type)")
-    end
-end
-
-function apply_delta(reference :: LongDNA{4}, entry :: JournalEntry)
-    return _apply_entry!(copy(reference), entry)
-end
-
-
-"""
-Apply multiple deltas to a sequence.
-
-# Args: 
-   - `reference`: LongDNA{4} reference sequence. 
-   - `delta`: DeltaMap of JournalEntries.
-
-# Returns: 
-   - Modified LongDNA{4} sequence.
-
-# Examples: 
-```julia-repl
-    julia> apply_delta(ref_seq, delta_map) 
-```
-"""
-function apply_delta(reference :: LongDNA{4}, delta :: DeltaMap)
-
-    seq = copy(reference)
-    for (_, entry) in delta
-        seq = _apply_entry!(seq, entry)
-    end
-    return seq
 end
 
 

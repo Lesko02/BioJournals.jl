@@ -60,15 +60,13 @@ Get sequences at a specific timestamp in a JournaledString.
 """
 function get_sequences_at_time(jst :: JournaledString, time :: Int)
     sequences_at_time = Vector{LongDNA{4}}(undef, length(jst.deltaMap))
-    for i in 1:length(jst.deltaMap)
-        filtered_delta = DeltaMap(Base.Order.Forward)
+    for i in eachindex(jst.deltaMap)
+        kept = JournalEntry[]
         for (entry_time, entry) in jst.deltaMap[i]
-            if entry_time > time
-                break
-            end
-            filtered_delta[entry_time] = entry
+            entry_time > time && break
+            push!(kept, entry)
         end
-        sequences_at_time[i] = apply_delta(jst.reference, filtered_delta)
+        sequences_at_time[i] = apply_delta(jst.reference, kept)
     end
     return sequences_at_time
 end

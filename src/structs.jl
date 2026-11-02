@@ -56,22 +56,154 @@ Enumeration of delta types for sequence modifications.
 @enum DeltaType DeltaTypeDel DeltaTypeIns DeltaTypeSnp DeltaTypeSV DeltaTypeCNV
 
 """
-Represents a single modification in a journaled sequence.
+    Deletion(len)
 
-# Fields: 
-   - `delta_type`: Type of modification (DeltaType). 
-   - `position`: Position of the modification. 
-   - `data`: Modification data (can be any type). 
-   - `time`: Time key for ordering modifications.
+Remove `len` reference bases starting at the entry's reference position.
+"""
+struct Deletion
+    len :: Int
+end
+
+"""
+    Insertion(seq)
+
+Insert `seq` immediately before the reference base at the entry's position.
+"""
+struct Insertion
+    seq :: LongDNA{4}
+end
+
+"""
+    Substitution(base)
+
+Replace the reference base at the entry's position.
+"""
+struct Substitution
+    base :: DNA
+end
+
+"""
+    StructuralVariant(seq)
+
+Insert `seq` before a reference base, or append it when the position is at
+or beyond the reference end. Positions past the end are padded with `-`.
+"""
+struct StructuralVariant
+    seq :: LongDNA{4}
+end
+
+"""
+    CopyNumber(seq, copies)
+
+Insert `copies` tandem copies of `seq` before the reference base at the
+entry's position.
+"""
+struct CopyNumber
+    seq :: LongDNA{4}
+    copies :: Int
+end
+
+"""Payload stored on a [`JournalEntry`](@ref). Positions are reference coordinates."""
+const DeltaPayload = Union{Deletion, Insertion, Substitution, StructuralVariant, CopyNumber}
+
+_as_dna4(seq :: LongDNA{4}) = copy(seq)
+_as_dna4(seq) = LongDNA{4}(seq)
+_as_base(base :: DNA) = base
+_as_base(base) = convert(DNA, base)
+
+"""
+Translate a constructor argument into a [`DeltaPayload`](@ref).
+
+Accepted inputs, by delta type:
+
+  - deletion: a positive length, or a `Deletion`
+  - insertion: a DNA sequence, or an `Insertion`
+  - SNP: a `DNA` or `Char`, or a `Substitution`
+  - structural variant: a DNA sequence, or a `StructuralVariant`
+  - copy number: `(sequence, copies)`, or a `CopyNumber`
+"""
+function make_payload(kind :: DeltaType, data)
+    if kind == DeltaTypeDel
+        data isa Deletion && return data
+        len = Int(data)
+        len >= 1 || throw(ArgumentError("deletion length must be positive, got $len"))
+        return Deletion(len)
+    elseif kind == DeltaTypeIns
+        data isa Insertion && return data
+        seq = _as_dna4(data)
+        isempty(seq) && throw(ArgumentError("insertion sequence must not be empty"))
+        return Insertion(seq)
+    elseif kind == DeltaTypeSnp
+        data isa Substitution && return data
+        return Substitution(_as_base(data))
+    elseif kind == DeltaTypeSV
+        data isa StructuralVariant && return data
+        seq = _as_dna4(data)
+        isempty(seq) && throw(ArgumentError("structural variant sequence must not be empty"))
+        return StructuralVariant(seq)
+    elseif kind == DeltaTypeCNV
+        data isa CopyNumber && return data
+        seq, copies = data
+        copies >= 1 || throw(ArgumentError("copy number must be positive, got $copies"))
+        return CopyNumber(_as_dna4(seq), Int(copies))
+    else
+        throw(ArgumentError("unsupported delta type $kind"))
+    end
+end
+
+"""
+    JournalEntry(kind, position, data, time)
+
+One mutation against the reference sequence.
+
+`position` is a 1-based coordinate on the **reference**, not on an
+already edited copy. Replay maps it through every earlier edit, so
+removing an event leaves the other reference coordinates valid.
+
+`data` is normalized into a [`DeltaPayload`](@ref). `time` orders edits
+and is the key used by [`DeltaMap`](@ref).
 """
 struct JournalEntry
     delta_type :: DeltaType
     position :: Int64
-    data :: Any
+    payload :: DeltaPayload
     time :: Timestamp
+
+    function JournalEntry(kind :: DeltaType, position :: Integer, data, time :: Integer)
+        pos = Int64(position)
+        pos >= 1 || throw(ArgumentError("reference position must be >= 1, got $pos"))
+        stamped = time isa Timestamp ? time : Timestamp(time)
+        return new(kind, pos, make_payload(kind, data), stamped)
+    end
 end
 
-Base.isless(a::JournalEntry, b::JournalEntry) = a.position < b.position
+# Sequences are mutable, so Julia does not synthesize content equality for
+# the payload structs that hold them.
+Base.:(==)(a :: Insertion, b :: Insertion) = a.seq == b.seq
+Base.hash(a :: Insertion, h :: UInt) = hash(a.seq, hash(Insertion, h))
+
+Base.:(==)(a :: StructuralVariant, b :: StructuralVariant) = a.seq == b.seq
+Base.hash(a :: StructuralVariant, h :: UInt) = hash(a.seq, hash(StructuralVariant, h))
+
+Base.:(==)(a :: CopyNumber, b :: CopyNumber) = a.copies == b.copies && a.seq == b.seq
+Base.hash(a :: CopyNumber, h :: UInt) = hash(a.copies, hash(a.seq, hash(CopyNumber, h)))
+
+Base.:(==)(a :: JournalEntry, b :: JournalEntry) =
+    a.delta_type == b.delta_type &&
+    a.position == b.position &&
+    a.payload == b.payload &&
+    a.time == b.time
+Base.hash(a :: JournalEntry, h :: UInt) =
+    hash(a.time, hash(a.payload, hash(a.position, hash(a.delta_type, h))))
+
+Base.isless(a :: JournalEntry, b :: JournalEntry) = a.position < b.position
+
+function Base.show(io :: IO, entry :: JournalEntry)
+    print(io, "JournalEntry(", entry.delta_type,
+          ", ref=", entry.position,
+          ", ", entry.payload,
+          ", t=", UInt64(entry.time), ")")
+end
 
 
 """
@@ -94,7 +226,8 @@ end
 
 
 """
-A DNA sequence with associated modifications.
+A reference DNA sequence plus one journal of edits per derived sequence.
+Edits store 1-based reference coordinates.
 
 # Fields: 
    - `reference`: Original LongDNA{4} sequence. 

@@ -49,6 +49,14 @@ add https://github.com/Lesko02/BioJournals.jl
 ```
 
 
+## Coordinates
+
+Every mutation records a 1-based position on the **reference** sequence.
+Replay maps that position through the edits that happened earlier, so an
+insertion does not invalidate a later SNP, and deleting an edit does not
+require rebasing the events that remain. Structural variants positioned at
+or beyond the last reference base are appended.
+
 ## Usage
 
 Create and manipulate journaled sequences:
@@ -86,9 +94,9 @@ search: JournaledString JournalEntry unsafe_string
 
     •  reference: Original LongDNA{4} sequence.
 
-    •  deltaMap: Vector of DeltaMaps storing modifications.
+    •  deltaMap: One time-ordered journal per derived sequence.
 
-    •  current_time: Current timestamp for modifications.
+    •  current_time: Timestamp assigned to the next edit.
 
   Constructor:
   ≡≡≡≡≡≡≡≡≡≡≡≡

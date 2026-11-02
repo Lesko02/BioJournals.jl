@@ -154,9 +154,11 @@ Sequence 10: AGATCGAGCGAGCTAGCGACTCAG"
         10 => [12:15]
     )
 
-    test_return3= Dict(
-        1 => [9:11, 13:15, 16:18, 20:23],
-        2 => [9:11, 13:15, 16:18, 20:23],
+    # Same hits a scanner of the materialized sequence reports. Edited
+    # sequences pick up the junction match at 9:11 and drop overlaps.
+    test_return3 = Dict(
+        1 => [9:11, 16:18, 20:23],
+        2 => [9:11, 16:18, 20:23],
         3 => [8:11, 13:15],
         4 => [8:11, 13:15],
         5 => [8:11, 13:15],
@@ -164,20 +166,7 @@ Sequence 10: AGATCGAGCGAGCTAGCGACTCAG"
         7 => [8:11, 13:15],
         8 => [8:11, 13:15],
         9 => [8:11, 13:15],
-        10 => [8:11, 13:15]
-    )
-
-    test_return4= Dict(
-    1 => [9:11, 16:18, 20:23],
-    2 => [9:11, 16:18, 20:23],
-    3 => [8:11, 13:15],
-    4 => [8:11, 13:15],
-    5 => [8:11, 13:15],
-    6 => [8:11, 13:15],
-    7 => [8:11, 13:15],
-    8 => [8:11, 13:15],
-    9 => [8:11, 13:15],
-    10 => [8:11, 13:15]    
+        10 => [8:11, 13:15],
     )
 
     needle = LongDNA{4}("AAAAAAAAAA")
@@ -192,6 +181,11 @@ Sequence 10: AGATCGAGCGAGCTAGCGACTCAG"
     
     @test approximate_search(js1, needle2, 5) == test_return3
     @test approximate_search(js1, needle2) == test_return3
+    for index in 1:length(js1.deltaMap)
+        materialized = apply_delta(js1.reference, collect(values(js1.deltaMap[index])))
+        @test approximate_search(js1, needle2)[index] ==
+              approximate_findall(ApproximateSearchQuery(needle2), 1, materialized)
+    end
 
     ## Tree section
     
@@ -202,10 +196,10 @@ Sequence 10: AGATCGAGCGAGCTAGCGACTCAG"
     @test exact_search(test_tree, needle2) == test_return2
 
     @test approximate_search(test_tree, needle) == test_return
-    @test approximate_search(test_tree, needle2) == test_return4
+    @test approximate_search(test_tree, needle2) == test_return3
 
     @test approximate_search(test_tree, needle, 15) == test_return
-    @test approximate_search(test_tree, needle2, 5) == test_return4
+    @test approximate_search(test_tree, needle2, 5) == test_return3
 
     
     ## end Test of search
@@ -213,9 +207,9 @@ Sequence 10: AGATCGAGCGAGCTAGCGACTCAG"
 
     ## Testing for Errors
 
-    @test_throws ErrorException approximate_search(js1, needle, 0)
-    @test_throws ErrorException approximate_search(js1, needle, 100)
-    @test_throws ErrorException approximate_search(test_tree, needle, 115)
+    @test_throws ArgumentError approximate_search(js1, needle, 0)
+    @test_throws ArgumentError approximate_search(js1, needle, 100)
+    @test_throws ArgumentError approximate_search(test_tree, needle, 115)
     # A budget that covers the whole 4-mer used to call `last` on an empty range.
     @test approximate_search(js1, needle2, 99) isa Dict
 
@@ -244,7 +238,7 @@ Sequence 10: AGATCGAGCGAGCTAGCGACTCAG"
     remove_delta!(js3, 3, 5)
     
     @test get_sequences_at_time(js3, 3) == test_return_time
-    @test_throws ErrorException remove_delta!(js3, 1, 15)
+    @test_throws ArgumentError remove_delta!(js3, 1, 15)
 
     redirect_stdout(devnull) do
         print_sequences(js3)
@@ -288,7 +282,35 @@ Sequence 10: AGATCGAGCGAGCTAGCGACTCAG"
     end
     
     ## End Test of IO functions
-    
+
+    @testset "reference coordinates" begin
+        ref = LongDNA{4}("AGATCGAGCGAGCTAGCGACTCAG")
+        stacked = JournaledString(ref, DeltaMap(1))
+        add_delta!(stacked, [1], DeltaTypeIns, 8, "CGTA")
+        add_delta!(stacked, [1], DeltaTypeSnp, 10, 'C')
+        # Reference base 10 stays a G until the SNP, and the insertion does not move that coordinate.
+        @test String(apply_delta(ref, stacked.deltaMap[1])) == "AGATCGACGTAGCCAGCTAGCGACTCAG"
+        remove_delta!(stacked, 1, 0)
+        @test String(apply_delta(ref, stacked.deltaMap[1])) == "AGATCGAGCCAGCTAGCGACTCAG"
+
+        swallowed = JournaledString(LongDNA{4}("ACGTACGT"), DeltaMap(1))
+        add_delta!(swallowed, [1], DeltaTypeIns, 3, "TT")
+        add_delta!(swallowed, [1], DeltaTypeDel, 2, 2)
+        @test String(apply_delta(swallowed.reference, swallowed.deltaMap[1])) == "ATACGT"
+
+        entry = JournalEntry(DeltaTypeIns, 2, "TT", 0)
+        @test entry.payload isa Insertion
+        @test String(entry.payload.seq) == "TT"
+        @test JournalEntry(DeltaTypeDel, 4, 2, 1).payload == Deletion(2)
+        @test JournalEntry(DeltaTypeSnp, 4, 'G', 1).payload == Substitution(DNA_G)
+        @test_throws ArgumentError JournalEntry(DeltaTypeSnp, 0, 'A', 0)
+        @test_throws BoundsError add_delta!(stacked, [2], DeltaTypeSnp, 1, 'A')
+
+        synced = JSTree(ref, 1)
+        add_delta!(synced, [1], DeltaTypeSnp, 1, 'T')
+        @test !isempty(synced.rootChildren)
+        @test first(values(first(synced.rootChildren).delta)).position == 1
+    end
 
 end
 

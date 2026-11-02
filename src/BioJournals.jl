@@ -12,6 +12,7 @@ using CodecZlib
 include("structs.jl")
 include("api.jl")
 include("functions.jl")
+include("apply.jl")
 include("algorithms.jl")
 include("io.jl")
 
@@ -19,8 +20,14 @@ export DeltaType,
     DeltaTypeDel,
     DeltaTypeIns,
     DeltaTypeSnp,
-    DeltaTypeSV, 
+    DeltaTypeSV,
     DeltaTypeCNV,
+
+    Deletion,
+    Insertion,
+    Substitution,
+    StructuralVariant,
+    CopyNumber,
 
     JournalEntry,
     JournaledString,
@@ -63,7 +70,6 @@ export DeltaType,
     write_fastq,
 
     build_tree!,
-    _print_node,
     delta_count
     
 end
