@@ -8,7 +8,7 @@
 # and rescan only a window around each edit wide enough to contain every
 # new or broken match.
 
-function approximate_findall(query, tolerance :: Int, seq :: LongDNA{4})
+function approximate_findall(query, tolerance :: Int, seq :: LongSequence)
     results = UnitRange{Int64}[]
     pos = findfirst(query, tolerance, seq)
     while pos !== nothing && !isempty(pos)
@@ -125,7 +125,7 @@ function _greedy_hits(candidates, resume :: Int)
 end
 
 function _hits_on_sequence(search_window! :: Function,
-                           reference :: LongDNA{4},
+                           reference :: LongSequence,
                            edits,
                            all_ref_hits,
                            clean_hits,
@@ -191,7 +191,7 @@ function _reference_of(tree :: JSTree)
     return tree.root
 end
 
-function _all_exact(query, seq :: LongDNA{4})
+function _all_exact(query, seq :: LongSequence)
     hits = UnitRange{Int64}[]
     pos = findfirst(query, seq)
     while pos !== nothing && !isempty(pos)
@@ -203,7 +203,16 @@ function _all_exact(query, seq :: LongDNA{4})
     return hits
 end
 
-function exact_search(journal, needle :: LongDNA)
+"""
+    exact_search(journal, needle) -> Dict{Int, Vector{UnitRange{Int}}}
+
+Find exact matches of `needle` in every derived sequence.
+
+The result maps a 1-based sequence index to the match intervals in that
+derived sequence. Intervals are 1-based and closed. A sequence with no
+edits reuses the matches found on the reference.
+"""
+function exact_search(journal, needle :: LongSequence)
     reference = _reference_of(journal)
     query = ExactSearchQuery(needle)
     clean_hits = collect(BioSequences.findall(query, reference))
@@ -229,7 +238,7 @@ Find `needle` in every sequence of a `JournaledString` or `JSTree`.
 `tol` is the allowed mismatch percentage, from 1 through 99. The default
 is 5. Hits are sorted and unique.
 """
-function approximate_search(journal, needle :: LongDNA, tol :: Integer = 5)
+function approximate_search(journal, needle :: LongSequence, tol :: Integer = 5)
     _check_tolerance(tol)
     reference = _reference_of(journal)
     budget = _error_budget(needle, tol)
@@ -252,7 +261,7 @@ function approximate_search(journal, needle :: LongDNA, tol :: Integer = 5)
 end
 
 """Every approximate hit, including ones the public scanner skips as overlaps."""
-function _all_approx(query, budget :: Int, seq :: LongDNA{4})
+function _all_approx(query, budget :: Int, seq :: LongSequence)
     hits = UnitRange{Int64}[]
     pos = findfirst(query, budget, seq)
     while pos !== nothing && !isempty(pos)

@@ -4,30 +4,6 @@
 
 
 """
-Insert a subsequence into a DNA sequence.
-Uses the BioJournals insert.
-
-# Args:
-   - `seq`: A LongDNA{4} sequence to modify. 
-   - `pos`: Position where the subsequence is inserted. 
-   - `subseq`: A LongDNA sequence to insert.
-
-# Returns:
-   - Updated LongDNA{4} sequence.
-
-# Examples:
-```julia-repl
-    julia> String(insert!(LongDNA{4}("ACGT"), 2, LongDNA{4}("CG")))
-    "ACGCGT"
-```
-"""
-function insert!(seq :: LongDNA{4}, pos :: Int, subseq :: LongDNA)
-    # One shift of the tail, instead of one insert per symbol.
-    return BioSequences.spliceinto!(seq, pos, subseq)
-end
-
-
-"""
 Delete a range of symbols from a DNA sequence.
 
 # Args:
@@ -40,10 +16,10 @@ Delete a range of symbols from a DNA sequence.
 # Examples:
 ```julia-repl
     julia> String(delete_at!(LongDNA{4}("ACGTACGT"), 3:5))
-    "ACACGT"
+    "ACCGT"
 ```
 """
-function delete_at!(seq :: LongDNA, pos_range :: UnitRange{Int})
+function delete_at!(seq :: LongSequence, pos_range :: UnitRange{<:Integer})
     isempty(pos_range) && return seq
     return deleteat!(seq, pos_range)
 end
@@ -62,29 +38,36 @@ Apply a structure variation to a DNA sequence.
 
 # Examples: 
 ```julia-repl
-    julia> structure_variation!(LongDNA{4}("ACGT"), 4, LongDNA("TT")) 
-    LongDNA{4}("ACGTTT") 
+    julia> structure_variation!(LongDNA{4}("ACGT"), 4, dna"TT")
+    LongDNA{4}("ACGTTT")
 ```
 """
-function structure_variation!(seq :: LongDNA{4},
-                              pos :: Int,
-                              subseq :: LongDNA)
-    ## Check if it's a base case of an append!
+function _append_gaps!(seq :: LongSequence, n :: Integer)
+    n <= 0 && return seq
+    symbol = gap(eltype(seq))
+    symbol in symbols(Alphabet(seq)) ||
+        throw(ArgumentError(
+            "alphabet $(typeof(Alphabet(seq))) cannot encode a gap; " *
+            "use a 4-bit nucleic alphabet such as LongDNA{4} or LongRNA{4} " *
+            "for a structural variant past the reference end",
+        ))
+    for _ in 1:n
+        push!(seq, symbol)
+    end
+    return seq
+end
+
+function structure_variation!(seq :: LongSequence, pos :: Integer, subseq :: LongSequence)
+    pos >= 1 || throw(ArgumentError("position must be >= 1, got $pos"))
     if pos == lastindex(seq)
         append!(seq, subseq)
-        return seq
-        ## Check if it's a base case of insert!
     elseif pos < lastindex(seq)
-        insert!(seq, pos, subseq)
-        return seq
-        ## Check of an out of bounds insert --> SV
+        spliceinto!(seq, pos, subseq)
     elseif pos > lastindex(seq)
-        for _ in lastindex(seq):pos-1
-            push!(seq, '-')
-        end
+        _append_gaps!(seq, pos - lastindex(seq))
         append!(seq, subseq)
-        return seq
     end
+    return seq
 end
 
 
@@ -105,38 +88,21 @@ Apply a copy number variation (CNV).
     "AGGGGGGCGT"
 ```    
 """
-function copy_number_variation!(seq :: LongDNA{4},
-                                pos :: Int,
-                                params :: Tuple{LongDNA{4}, Int})
-    subseq, rep = params  # Deconstruct the tuple
-    for i in 1:rep  # Insert subseq `rep` times
-        insert!(seq, pos, subseq)
-    end    
+function copy_number_variation!(seq :: LongSequence,
+                                pos :: Integer,
+                                params :: Tuple{<:LongSequence, <:Integer})
+    subseq, copies = params
+    pos >= 1 || throw(ArgumentError("position must be >= 1, got $pos"))
+    copies >= 1 || throw(ArgumentError("copy number must be positive, got $copies"))
+    for _ in 1:copies
+        spliceinto!(seq, pos, subseq)
+    end
     return seq
 end
 
 
 ### End of deltas
 
-"""
-Prints a visual tree representation.
-
-# Args: 
-   - `tree`: JSTree structure. 
-   - `node_name`: Node to start from. 
-   - `indent`: Indentation level.
-
-# Returns: 
-   - None (prints tree).
-
-# Examples: 
-```julai-repl
-    julia> print_tree(tree) 
-    |- root
-       |- pos, deltatype, index
-       |- pos, deltatype, index
-```
-"""
 function _print_node(node::JSTNode, indent::Int)
     # build a label from its delta dict
     first_e  = first(values(node.delta))
@@ -154,7 +120,13 @@ function _print_node(node::JSTNode, indent::Int)
     end
 end
 
-# top-level: print each root child
+"""
+    print_tree(tree)
+
+Print the tree derived from `tree`'s journal. Each line is one edit
+bucket: reference position, sequence indices, and delta type. The tree
+is rebuilt from the journal before printing.
+"""
 function print_tree(tree :: JSTree)
     build_tree!(tree)
     for node in tree.rootChildren
@@ -265,14 +237,15 @@ function _check_indices(n :: Integer, indices)
     return nothing
 end
 
-function add_delta!(js :: JournaledString,
-                    indices :: Vector{Int},
+function add_delta!(js :: JournaledString{S},
+                    indices :: AbstractVector{<:Integer},
                     delta_type :: DeltaType,
-                    position :: Int,
-                    data)
+                    position :: Integer,
+                    data) where {S <: LongSequence}
     _check_indices(length(js.deltaMap), indices)
     for idx in indices
-        new_entry = JournalEntry(delta_type, position, data, js.current_time)
+        new_entry = JournalEntry{S}(delta_type, position, data, js.current_time)
+        _ensure_applicable(js.reference, new_entry)
         js.deltaMap[idx][js.current_time] = new_entry
         js.current_time += UInt64(1)
     end
@@ -286,17 +259,19 @@ position, creating it when no such bucket exists.
 Buckets are matched by value, so two separately built but equal payloads
 land in the same branch.
 """
-function _matching_bucket!(buckets :: Vector{Dict{Int64, JournalEntry}},
+function _matching_bucket!(::Type{S},
+                           buckets :: Vector{Dict{Int64, JournalEntry{S}}},
                            delta_type :: DeltaType,
-                           data)
+                           data) where {S <: LongSequence}
+    payload = make_payload(S, delta_type, data)
     for bucket in buckets
         isempty(bucket) && continue
         entry = first(values(bucket))
-        if entry.delta_type == delta_type && entry.payload == make_payload(delta_type, data)
+        if entry.delta_type == delta_type && entry.payload == payload
             return bucket
         end
     end
-    bucket = Dict{Int64, JournalEntry}()
+    bucket = Dict{Int64, JournalEntry{S}}()
     push!(buckets, bucket)
     return bucket
 end
@@ -307,23 +282,24 @@ Adds a delta to every listed sequence in a JSTree.
 Entries that share a position, delta type, and payload share one bucket,
 which `build_tree!` later turns into one branch.
 """
-function _insert_tree_entry!(tree :: JSTree, idx :: Integer, entry :: JournalEntry)
+function _insert_tree_entry!(tree :: JSTree{S}, idx :: Integer, entry :: JournalEntry{S}) where {S <: LongSequence}
     vec = get!(tree.journal, entry.position) do
-        Vector{Dict{Int64, JournalEntry}}()
+        Vector{Dict{Int64, JournalEntry{S}}}()
     end
-    bucket = _matching_bucket!(vec, entry.delta_type, entry.payload)
+    bucket = _matching_bucket!(S, vec, entry.delta_type, entry.payload)
     bucket[Int64(idx)] = entry
     return nothing
 end
 
-function add_delta!(tree :: JSTree,
-                    indices :: Vector{Int},
+function add_delta!(tree :: JSTree{S},
+                    indices :: AbstractVector{<:Integer},
                     delta_type :: DeltaType,
-                    position :: Int,
-                    data)
+                    position :: Integer,
+                    data) where {S <: LongSequence}
     _check_indices(tree.length, indices)
     for idx in indices
-        entry = JournalEntry(delta_type, position, data, tree.current_time)
+        entry = JournalEntry{S}(delta_type, position, data, tree.current_time)
+        _ensure_applicable(tree.root, entry)
         _insert_tree_entry!(tree, idx, entry)
         tree.current_time += UInt64(1)
     end
@@ -344,10 +320,11 @@ with the tree's current_time (and then incrementing it).
 # Returns
 - `nothing`  : mutates `tree.journal` and `tree.current_time`
 """
-function add_delta!(tree :: JSTree, indices :: Vector{Int}, entry :: JournalEntry)
+function add_delta!(tree :: JSTree{S}, indices :: AbstractVector{<:Integer}, entry :: JournalEntry) where {S <: LongSequence}
     _check_indices(tree.length, indices)
     for idx in indices
-        stamped = JournalEntry(entry.delta_type, entry.position, entry.payload, tree.current_time)
+        stamped = JournalEntry{S}(entry.delta_type, entry.position, entry.payload, tree.current_time)
+        _ensure_applicable(tree.root, stamped)
         _insert_tree_entry!(tree, idx, stamped)
         tree.current_time += UInt64(1)
     end
@@ -355,9 +332,9 @@ function add_delta!(tree :: JSTree, indices :: Vector{Int}, entry :: JournalEntr
     return nothing
 end
 
-function build_tree!(tree::JSTree)
-    tree.rootChildren = JSTNode[]             # clear any prior structure
-    lastPrimary = nothing                       # tracks the main chain
+function build_tree!(tree :: JSTree{S}) where {S <: LongSequence}
+    tree.rootChildren = JSTNode{S}[]
+    lastPrimary = nothing
 
     for (pos, buckets) in tree.journal
         if isempty(buckets)
@@ -366,7 +343,7 @@ function build_tree!(tree::JSTree)
 
         # first bucket = primary chain node
         b0 = buckets[1]
-        node0 = JSTNode(nothing, copy(b0), JSTNode[])
+        node0 = JSTNode{S}(nothing, copy(b0), JSTNode{S}[])
         if lastPrimary === nothing
             push!(tree.rootChildren, node0)
         else
@@ -377,7 +354,7 @@ function build_tree!(tree::JSTree)
 
         # any other buckets at same pos = secondary branches
         for b in buckets[2:end]
-            node = JSTNode(nothing, copy(b), JSTNode[])
+            node = JSTNode{S}(nothing, copy(b), JSTNode{S}[])
             parentNode = node0.parent
             node.parent = parentNode
             if parentNode === nothing
@@ -405,18 +382,38 @@ Adds a JournalEntry to indices.
     julia> add_delta!(js, [1], entry)
 ```
 """
-function add_delta!(js :: JournaledString,
-                    indices :: Vector{Int},
-                    entry :: JournalEntry)
+function add_delta!(js :: JournaledString{S},
+                    indices :: AbstractVector{<:Integer},
+                    entry :: JournalEntry) where {S <: LongSequence}
     _check_indices(length(js.deltaMap), indices)
     for idx in indices
-        stamped = JournalEntry(entry.delta_type, entry.position, entry.payload, js.current_time)
+        stamped = JournalEntry{S}(entry.delta_type, entry.position, entry.payload, js.current_time)
+        _ensure_applicable(js.reference, stamped)
         js.deltaMap[idx][js.current_time] = stamped
         js.current_time += UInt64(1)
     end
     return nothing
 end
 
+"""
+    add_delta!(journal, index, kind, position, data)
+    add_delta!(journal, index, entry)
+
+Record one edit on a single derived sequence. `index` is 1-based.
+"""
+function add_delta!(journal :: Union{JournaledString, JSTree},
+                    index :: Integer,
+                    delta_type :: DeltaType,
+                    position :: Integer,
+                    data)
+    return add_delta!(journal, [Int(index)], delta_type, position, data)
+end
+
+function add_delta!(journal :: Union{JournaledString, JSTree},
+                    index :: Integer,
+                    entry :: JournalEntry)
+    return add_delta!(journal, [Int(index)], entry)
+end
 
 """
 Removes a delta by time key.
@@ -433,7 +430,7 @@ Removes a delta by time key.
     julia> remove_delta!(js, 5) 
 ```
 """
-function remove_delta!(js :: JournaledString, idx :: Int, time :: Integer)
+function remove_delta!(js :: JournaledString, idx :: Integer, time :: Integer)
     _check_indices(length(js.deltaMap), (idx,))
     key = Timestamp(time)
     delta = js.deltaMap[idx]

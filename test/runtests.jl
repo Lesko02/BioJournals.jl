@@ -107,9 +107,9 @@ Sequence 10: AGATCGAGCGAGCTAGCGACTCAG"
 
     ## Test of removal
     
-    @test delta_count(tree1) == 5
+    @test BioJournals.delta_count(tree1) == 5
     remove_delta!(tree1, 1)
-    @test delta_count(tree1) == 4
+    @test BioJournals.delta_count(tree1) == 4
 
     kept = JournaledString(reference_seq, DeltaMap(1), 0)
     add_delta!(kept, [1], DeltaTypeIns, 1, "AA")
@@ -121,7 +121,7 @@ Sequence 10: AGATCGAGCGAGCTAGCGACTCAG"
     template = JournalEntry(DeltaTypeIns, 2, "TT", 0)
     add_delta!(same_payload, [1], template)
     add_delta!(same_payload, [2], template)
-    @test delta_count(same_payload) == 2
+    @test BioJournals.delta_count(same_payload) == 2
 
     different_edit = JSTree(reference_seq, 2)
     add_delta!(different_edit, [1], DeltaTypeSnp, 1, 'A')
@@ -184,7 +184,7 @@ Sequence 10: AGATCGAGCGAGCTAGCGACTCAG"
     for index in 1:length(js1.deltaMap)
         materialized = apply_delta(js1.reference, collect(values(js1.deltaMap[index])))
         @test approximate_search(js1, needle2)[index] ==
-              approximate_findall(ApproximateSearchQuery(needle2), 1, materialized)
+              BioJournals.approximate_findall(ApproximateSearchQuery(needle2), 1, materialized)
     end
 
     ## Tree section
@@ -318,5 +318,6 @@ include("timestamps.jl")
 include("sequences.jl")
 include("journal.jl")
 include("search_io.jl")
+include("aqua.jl")
 
 ### runtests.jl ends here.

@@ -72,6 +72,32 @@ function _anchor_insert_len(edits, anchor :: Int, ref_len :: Int)
     return total
 end
 
+"""
+Reject an edit that cannot be replayed on `reference`.
+
+Structural variants past the last reference base need a gap symbol.
+2-bit alphabets (`LongDNA{2}`, `LongRNA{2}`) cannot encode one.
+"""
+function _ensure_applicable(reference :: LongSequence, entry :: JournalEntry)
+    ref_len = length(reference)
+    _check_edit(entry, ref_len)
+    payload = entry.payload
+    if payload isa Substitution && !(payload.base in symbols(Alphabet(reference)))
+        throw(ArgumentError(
+            "symbol $(payload.base) is not in alphabet $(typeof(Alphabet(reference)))",
+        ))
+    elseif payload isa StructuralVariant && entry.position > ref_len
+        symbol = gap(eltype(reference))
+        symbol in symbols(Alphabet(reference)) ||
+            throw(ArgumentError(
+                "alphabet $(typeof(Alphabet(reference))) cannot encode a gap; " *
+                "use a 4-bit nucleic alphabet such as LongDNA{4} or LongRNA{4} " *
+                "for a structural variant past the reference end",
+            ))
+    end
+    return nothing
+end
+
 function _check_edit(entry :: JournalEntry, ref_len :: Int)
     payload = entry.payload
     if payload isa Deletion
@@ -86,9 +112,9 @@ function _check_edit(entry :: JournalEntry, ref_len :: Int)
     return nothing
 end
 
-function _repeat(seq :: LongDNA{4}, copies :: Int)
+function _repeat(seq :: S, copies :: Int) where {S <: LongSequence}
     copies == 1 && return copy(seq)
-    block = LongDNA{4}()
+    block = S()
     for _ in 1:copies
         append!(block, seq)
     end
@@ -99,16 +125,16 @@ end
 Apply `entry` to `seq`. `prior` contains the edits already applied, in time
 order, and `ref_len` is the length of the untouched reference.
 """
-function _apply_reference!(seq :: LongDNA{4}, entry :: JournalEntry, prior, ref_len :: Int)
+function _apply_reference!(seq :: LongSequence, entry :: JournalEntry, prior, ref_len :: Int)
     _check_edit(entry, ref_len)
     payload = entry.payload
     if payload isa Insertion
-        insert!(seq, _ref_base_pos(prior, entry.position, ref_len), payload.seq)
+        spliceinto!(seq, _ref_base_pos(prior, entry.position, ref_len), payload.seq)
     elseif payload isa Substitution
         seq[_ref_base_pos(prior, entry.position, ref_len)] = payload.base
     elseif payload isa CopyNumber
         block = _repeat(payload.seq, payload.copies)
-        insert!(seq, _ref_base_pos(prior, entry.position, ref_len), block)
+        spliceinto!(seq, _ref_base_pos(prior, entry.position, ref_len), block)
     elseif payload isa Deletion
         last_ref = entry.position + payload.len - 1
         start_base = _ref_base_pos(prior, entry.position, ref_len)
@@ -117,13 +143,10 @@ function _apply_reference!(seq :: LongDNA{4}, entry :: JournalEntry, prior, ref_
         delete_at!(seq, (start_base - lead):end_base)
     elseif payload isa StructuralVariant
         if entry.position >= ref_len
-            gaps = entry.position - ref_len
-            if gaps > 0
-                append!(seq, LongDNA{4}("-"^gaps))
-            end
+            _append_gaps!(seq, entry.position - ref_len)
             append!(seq, payload.seq)
         else
-            insert!(seq, _ref_base_pos(prior, entry.position, ref_len), payload.seq)
+            spliceinto!(seq, _ref_base_pos(prior, entry.position, ref_len), payload.seq)
         end
     else
         throw(ArgumentError("unsupported payload $(typeof(payload))"))
@@ -132,17 +155,17 @@ function _apply_reference!(seq :: LongDNA{4}, entry :: JournalEntry, prior, ref_
 end
 
 """
-    apply_delta(reference, entries) -> LongDNA{4}
+    apply_delta(reference, entries) -> LongSequence
 
 Replay `entries` against `reference`. Each position is a reference
 coordinate. Edits are applied in timestamp order.
 """
-function apply_delta(reference :: LongDNA{4}, entries :: AbstractVector{JournalEntry})
+function apply_delta(reference :: S, entries :: AbstractVector{<:JournalEntry}) where {S <: LongSequence}
     seq = copy(reference)
     isempty(entries) && return seq
     ordered = sort(entries; by = entry -> UInt64(entry.time))
     ref_len = length(reference)
-    prior = JournalEntry[]
+    prior = JournalEntry{S}[]
     sizehint!(prior, length(ordered))
     for entry in ordered
         _apply_reference!(seq, entry, prior, ref_len)
@@ -151,21 +174,26 @@ function apply_delta(reference :: LongDNA{4}, entries :: AbstractVector{JournalE
     return seq
 end
 
-apply_delta(reference :: LongDNA{4}, entry :: JournalEntry) =
-    apply_delta(reference, JournalEntry[entry])
+apply_delta(reference :: LongSequence, entry :: JournalEntry) =
+    apply_delta(reference, [entry])
 
-apply_delta(reference :: LongDNA{4}, delta :: DeltaMap) =
+apply_delta(reference :: LongSequence, delta :: DeltaMap) =
     apply_delta(reference, collect(values(delta)))
 
-"""Edits for sequence `index`, oldest first."""
+"""
+    edits_at(journal, index) -> Vector{JournalEntry}
+
+Edits recorded for derived sequence `index`, oldest first.
+`index` is 1-based.
+"""
 function edits_at(js :: JournaledString, index :: Integer)
     _check_indices(length(js.deltaMap), (index,))
     return collect(values(js.deltaMap[index]))
 end
 
-function edits_at(tree :: JSTree, index :: Integer)
+function edits_at(tree :: JSTree{S}, index :: Integer) where {S <: LongSequence}
     _check_indices(tree.length, (index,))
-    found = JournalEntry[]
+    found = JournalEntry{S}[]
     for (_, buckets) in tree.journal
         for bucket in buckets
             if haskey(bucket, Int64(index))

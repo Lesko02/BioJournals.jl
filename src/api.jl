@@ -4,13 +4,49 @@
 
 
 """
-Retrieve the full mutation history from a DeltaMap.
+    sequence(journal, i) -> LongSequence
 
-# Args: 
-   - `delta_map`: The DeltaMap containing mutations.
+Materialize derived sequence `i`. This method is part of `FASTX.sequence`,
+so a journal and a FASTA/FASTQ record share one function. The result is an
+ordinary `LongSequence`: BioSequences `findall`, `translate`, and FASTX
+writers accept it directly.
 
-# Returns: 
-   - A string listing all mutations with timestamps.
+`i` is 1-based. For a `JournaledString` it indexes `deltaMap`. For a `JSTree`
+it indexes the sequences tracked by the tree.
+"""
+function sequence(js :: JournaledString, i :: Integer)
+    return apply_delta(js.reference, edits_at(js, i))
+end
+
+function sequence(tree :: JSTree, i :: Integer)
+    return apply_delta(tree.root, edits_at(tree, i))
+end
+
+"""
+    sequences(journal) -> Vector{<:LongSequence}
+
+Materialize every derived sequence in `journal`.
+"""
+function sequences(js :: JournaledString)
+    return [sequence(js, i) for i in eachindex(js.deltaMap)]
+end
+
+function sequences(tree :: JSTree)
+    return [sequence(tree, i) for i in 1:tree.length]
+end
+
+"""
+    nsequences(journal) -> Int
+
+Number of derived sequences stored in `journal`.
+"""
+nsequences(js :: JournaledString) = length(js.deltaMap)
+nsequences(tree :: JSTree) = tree.length
+
+"""
+    get_mutation_history(delta_map) -> String
+
+List every edit in `delta_map` with its timestamp.
 """
 function get_mutation_history(delta_map :: DeltaMap)
     io = IOBuffer()
@@ -55,15 +91,16 @@ Get sequences at a specific timestamp in a JournaledString.
    - `jst`: The JournaledString to extract sequences from. 
    - `time`: The timestamp limit for reconstruction.
 
-# Returns: 
-   - A vector of LongDNA{4} sequences at the given time.
+# Returns:
+   - A vector of sequences at the given time, in the reference alphabet.
 """
-function get_sequences_at_time(jst :: JournaledString, time :: Int)
-    sequences_at_time = Vector{LongDNA{4}}(undef, length(jst.deltaMap))
+function get_sequences_at_time(jst :: JournaledString{S}, time :: Integer) where {S <: LongSequence}
+    limit = Timestamp(time)
+    sequences_at_time = Vector{S}(undef, length(jst.deltaMap))
     for i in eachindex(jst.deltaMap)
-        kept = JournalEntry[]
+        kept = JournalEntry{S}[]
         for (entry_time, entry) in jst.deltaMap[i]
-            entry_time > time && break
+            entry_time > limit && break
             push!(kept, entry)
         end
         sequences_at_time[i] = apply_delta(jst.reference, kept)
@@ -84,7 +121,7 @@ Simulate a mutation in a JournaledString.
     The JournaledString in place.
 """
 function simulate_mutation!(jst :: JournaledString,
-                            index :: Int,
+                            index :: Integer,
                             entry :: JournalEntry)
    add_delta!(jst, [index], entry)
 end
@@ -102,8 +139,8 @@ Remove a mutation at a specific time.
    - The JournaledString in place.
 """
 function remove_mutation!(jst :: JournaledString,
-                          index :: Int,
-                          time  :: Int)
+                          index :: Integer,
+                          time :: Integer)
     remove_delta!(jst ,index, time)
 end
 
@@ -123,6 +160,7 @@ function is_equal(jst1 :: JournaledString,
                   jst2 :: JournaledString) :: Bool
     return jst1.reference == jst2.reference &&
            jst1.current_time == jst2.current_time &&
+           jst1.reference_id == jst2.reference_id &&
            jst1.deltaMap == jst2.deltaMap
 end
 
@@ -159,14 +197,16 @@ Print search results from a JournaledString.
    - Prints matches or indicates no matches.
 """
 function print_results(results :: Dict{Int64, Vector{UnitRange{Int64}}})
-    for i in 1:length(results)
-        if isempty(results[i])
+    for i in sort!(collect(keys(results)))
+        ranges = results[i]
+        if isempty(ranges)
             println("No Match in DeltaMap $i")
         else
             println("Match in $i:")
-            println("Ranges: ", results[i])
+            println("Ranges: ", ranges)
         end
     end
+    return nothing
 end
 
 
@@ -180,14 +220,16 @@ Print search results from a Journaled String Tree (JST).
    - Prints matches or indicates no matches.
 """
 function print_results(results :: Dict{String, Vector{UnitRange{Int64}}})
-    for (name, _) in results
-        if isempty(results[name])
+    for name in sort!(collect(keys(results)))
+        ranges = results[name]
+        if isempty(ranges)
             println("No Match at $name")
         else
             println("Match at $name:")
-            println("Ranges: ", results[name])
+            println("Ranges: ", ranges)
         end
     end
+    return nothing
 end
 
 

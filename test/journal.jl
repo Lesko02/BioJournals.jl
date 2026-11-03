@@ -45,7 +45,7 @@ end
     add_delta!(tree, [1], DeltaTypeSnp, 8, 'C')
     add_delta!(tree, [2], DeltaTypeSnp, 8, 'G')
 
-    @test delta_count(tree) == 4
+    @test BioJournals.delta_count(tree) == 4
     @test length(BioJournals.edits_at(tree, 1)) == 2
     printed = capture_stdout() do
         print_tree(tree)
@@ -54,25 +54,26 @@ end
     @test occursin("type=DeltaTypeSnp", printed)
     @test count(==('\n'), printed) >= 3
 
+    sequence_type = LongDNA{4}
     buckets = [
-        Dict{Int64, JournalEntry}(),
-        Dict(Int64(1) => JournalEntry(DeltaTypeSnp, 1, 'A', 0)),
+        Dict{Int64, JournalEntry{sequence_type}}(),
+        Dict(Int64(1) => JournalEntry{sequence_type}(DeltaTypeSnp, 1, 'A', 0)),
     ]
-    fresh = BioJournals._matching_bucket!(buckets, DeltaTypeIns, "TT")
+    fresh = BioJournals._matching_bucket!(sequence_type, buckets, DeltaTypeIns, "TT")
     @test isempty(fresh)
     @test length(buckets) == 3
 
-    tree.journal[99] = Dict{Int64, JournalEntry}[]
-    build_tree!(tree)
-    @test delta_count(tree) == 4
+    tree.journal[99] = Dict{Int64, JournalEntry{LongDNA{4}}}[]
+    BioJournals.build_tree!(tree)
+    @test BioJournals.delta_count(tree) == 4
 
     alone = JSTree(reference, 1)
     add_delta!(alone, [1], DeltaTypeSnp, 1, 'A')
     add_delta!(alone, [1], DeltaTypeSnp, 4, 'T')
     remove_delta!(alone, 1)
-    @test delta_count(alone) == 1
+    @test BioJournals.delta_count(alone) == 1
     remove_delta!(alone, 0)
-    @test delta_count(alone) == 0
+    @test BioJournals.delta_count(alone) == 0
     @test isempty(alone.journal)
     @test_throws ArgumentError remove_delta!(alone, 4)
 

@@ -3,15 +3,15 @@
 ### sequences.jl
 
 @testset "sequence primitives" begin
-    @test String(BioJournals.insert!(LongDNA{4}("ACGT"), 2, dna"CG")) == "ACGCGT"
-    @test String(delete_at!(LongDNA{4}("ACGT"), 2:1)) == "ACGT"
-    @test String(delete_at!(LongDNA{4}("ACGTACGT"), 3:5)) == "ACCGT"
+    @test String(BioSequences.spliceinto!(LongDNA{4}("ACGT"), 2, dna"CG")) == "ACGCGT"
+    @test String(BioJournals.delete_at!(LongDNA{4}("ACGT"), 2:1)) == "ACGT"
+    @test String(BioJournals.delete_at!(LongDNA{4}("ACGTACGT"), 3:5)) == "ACCGT"
 
-    @test String(structure_variation!(LongDNA{4}("ACGT"), 4, dna"TT")) == "ACGTTT"
-    @test String(structure_variation!(LongDNA{4}("ACGT"), 2, dna"TT")) == "ATTCGT"
-    @test String(structure_variation!(LongDNA{4}("ACGT"), 6, dna"TT")) == "ACGT--TT"
+    @test String(BioJournals.structure_variation!(LongDNA{4}("ACGT"), 4, dna"TT")) == "ACGTTT"
+    @test String(BioJournals.structure_variation!(LongDNA{4}("ACGT"), 2, dna"TT")) == "ATTCGT"
+    @test String(BioJournals.structure_variation!(LongDNA{4}("ACGT"), 6, dna"TT")) == "ACGT--TT"
 
-    @test String(copy_number_variation!(LongDNA{4}("ACGT"), 2, (dna"GG", 3))) == "AGGGGGGCGT"
+    @test String(BioJournals.copy_number_variation!(LongDNA{4}("ACGT"), 2, (dna"GG", 3))) == "AGGGGGGCGT"
 end
 
 @testset "payloads" begin
