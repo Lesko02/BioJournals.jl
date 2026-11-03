@@ -319,5 +319,6 @@ include("sequences.jl")
 include("journal.jl")
 include("search_io.jl")
 include("aqua.jl")
+include("doctests.jl")
 
 ### runtests.jl ends here.

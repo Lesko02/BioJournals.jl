@@ -156,9 +156,23 @@ end
 
 """
     apply_delta(reference, entries) -> LongSequence
+    apply_delta(reference, entry) -> LongSequence
+    apply_delta(reference, delta::DeltaMap) -> LongSequence
 
-Replay `entries` against `reference`. Each position is a reference
-coordinate. Edits are applied in timestamp order.
+Replay edits against `reference` and return the resulting sequence.
+
+Each position is a reference coordinate. Edits run in timestamp order.
+The reference itself is not modified. An empty edit list returns a copy
+of `reference`.
+
+# Examples
+```jldoctest
+julia> String(apply_delta(dna"ACGT", JournalEntry(DeltaTypeIns, 2, "TT", 0)))
+"ATTCGT"
+
+julia> String(apply_delta(dna"ACGT", JournalEntry(DeltaTypeSV, 6, dna"TT", 0)))
+"ACGT--TT"
+```
 """
 function apply_delta(reference :: S, entries :: AbstractVector{<:JournalEntry}) where {S <: LongSequence}
     seq = copy(reference)
@@ -184,7 +198,8 @@ apply_delta(reference :: LongSequence, delta :: DeltaMap) =
     edits_at(journal, index) -> Vector{JournalEntry}
 
 Edits recorded for derived sequence `index`, oldest first.
-`index` is 1-based.
+
+`index` is 1-based. An index outside the journal raises `BoundsError`.
 """
 function edits_at(js :: JournaledString, index :: Integer)
     _check_indices(length(js.deltaMap), (index,))

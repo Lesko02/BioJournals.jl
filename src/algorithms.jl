@@ -208,9 +208,18 @@ end
 
 Find exact matches of `needle` in every derived sequence.
 
-The result maps a 1-based sequence index to the match intervals in that
+The result maps a 1-based sequence index to match intervals in that
 derived sequence. Intervals are 1-based and closed. A sequence with no
-edits reuses the matches found on the reference.
+edits reuses the matches found on the reference. `needle` is a
+`LongSequence` in the same alphabet family as the reference.
+
+# Examples
+```jldoctest
+julia> exact_search(JournaledString(dna"ACGTACGT", 1), dna"ACGT")[1]
+2-element Vector{UnitRange{Int64}}:
+ 1:4
+ 5:8
+```
 """
 function exact_search(journal, needle :: LongSequence)
     reference = _reference_of(journal)
@@ -233,10 +242,14 @@ end
 """
     approximate_search(journal, needle, tol=5) -> Dict{Int, Vector{UnitRange{Int}}}
 
-Find `needle` in every sequence of a `JournaledString` or `JSTree`.
+Find approximate matches of `needle` in every derived sequence.
 
 `tol` is the allowed mismatch percentage, from 1 through 99. The default
-is 5. Hits are sorted and unique.
+is 5. The error budget is `ceil(length(needle) * tol / 100)` bases.
+Hits follow the same non-overlapping scan as BioSequences
+`approximate_findall`: after a hit, the next search starts `budget + 1`
+bases later. Reported intervals are sorted and unique. A `tol` outside
+1:99 raises `ArgumentError`.
 """
 function approximate_search(journal, needle :: LongSequence, tol :: Integer = 5)
     _check_tolerance(tol)

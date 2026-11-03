@@ -3,9 +3,9 @@
 
 Journaled DNA and RNA sequences for mutation tracking.
 
-Edits are stored as 1-based reference coordinates and replayed in time
-order. [`sequence`](@ref) materializes a derived sequence as an ordinary
-`LongSequence`.
+Edits are 1-based coordinates on a reference and are replayed in time
+order. [`sequence`](@ref) materializes a derived sequence as a
+`LongSequence`. See the README for coordinates, alphabets, and file I/O.
 """
 module BioJournals
 

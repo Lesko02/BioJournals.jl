@@ -4,20 +4,10 @@
 
 
 """
-Delete a range of symbols from a DNA sequence.
+    delete_at!(seq, range) -> LongSequence
 
-# Args:
-   - `seq`: A LongDNA sequence to modify. 
-   - `pos_range`: Range of positions to delete.
-
-# Returns:
-   - Updated LongDNA sequence.
-
-# Examples:
-```julia-repl
-    julia> String(delete_at!(LongDNA{4}("ACGTACGT"), 3:5))
-    "ACCGT"
-```
+Delete `range` from `seq` and return `seq`. An empty range leaves `seq`
+unchanged. The range is 1-based and closed, as in `deleteat!`.
 """
 function delete_at!(seq :: LongSequence, pos_range :: UnitRange{<:Integer})
     isempty(pos_range) && return seq
@@ -25,23 +15,6 @@ function delete_at!(seq :: LongSequence, pos_range :: UnitRange{<:Integer})
 end
 
 
-"""
-Apply a structure variation to a DNA sequence.
-
-# Args: 
-   - `seq`: A LongDNA{4} sequence to modify. 
-   - `pos`: Position where the variation occurs. 
-   - `subseq`: LongDNA sequence for variation.
-
-# Returns: 
-   - Updated LongDNA{4} sequence.
-
-# Examples: 
-```julia-repl
-    julia> structure_variation!(LongDNA{4}("ACGT"), 4, dna"TT")
-    LongDNA{4}("ACGTTT")
-```
-"""
 function _append_gaps!(seq :: LongSequence, n :: Integer)
     n <= 0 && return seq
     symbol = gap(eltype(seq))
@@ -57,6 +30,16 @@ function _append_gaps!(seq :: LongSequence, n :: Integer)
     return seq
 end
 
+"""
+    structure_variation!(seq, pos, allele) -> LongSequence
+
+Splice `allele` into `seq` at `pos` and return `seq`.
+
+A position before the last base inserts `allele` immediately before that
+base. The last position appends `allele`. A position past the end inserts
+`pos - lastindex(seq)` gap symbols and then appends `allele`. `pos` must
+be at least 1. A 2-bit alphabet cannot encode the gap pad.
+"""
 function structure_variation!(seq :: LongSequence, pos :: Integer, subseq :: LongSequence)
     pos >= 1 || throw(ArgumentError("position must be >= 1, got $pos"))
     if pos == lastindex(seq)
@@ -72,21 +55,12 @@ end
 
 
 """
-Apply a copy number variation (CNV).
+    copy_number_variation!(seq, pos, (allele, copies)) -> LongSequence
 
-# Args: 
-   - `seq`: A LongDNA{4} sequence to modify. 
-   - `pos`: Position for the variation. 
-   - `params`: Tuple (subseq, repetitions).
+Insert `copies` tandem copies of `allele` at `pos` and return `seq`.
 
-# Returns: 
-   - Updated LongDNA{4} sequence.
-
-# Examples: 
-```julia-repl
-    julia> String(copy_number_variation!(LongDNA{4}("ACGT"), 2, (LongDNA{4}("GG"), 3)))
-    "AGGGGGGCGT"
-```    
+Each copy is spliced at the same position, so identical copies stack to
+the left. `pos` and `copies` must be at least 1.
 """
 function copy_number_variation!(seq :: LongSequence,
                                 pos :: Integer,
@@ -123,9 +97,11 @@ end
 """
     print_tree(tree)
 
-Print the tree derived from `tree`'s journal. Each line is one edit
-bucket: reference position, sequence indices, and delta type. The tree
-is rebuilt from the journal before printing.
+Print the tree derived from the journal of `tree`.
+
+Each line is one edit bucket: reference position, sequence indices, and
+delta type. The tree is rebuilt from the journal before printing. Output
+goes to `stdout`.
 """
 function print_tree(tree :: JSTree)
     build_tree!(tree)
@@ -136,19 +112,10 @@ function print_tree(tree :: JSTree)
 end
 
 """
-Prints sequences from a JournaledString.
+    print_sequences(journal)
 
-# Args: 
-   - `jst`: JournaledString structure.
-
-# Returns: 
-   - None (prints sequences).
-
-# Examples: 
-```julia-repl
-    julia> print_sequences(jst) 
-    Sequence 1: ACGT... 
-```
+Print every derived sequence of `journal` to `stdout`, one per line,
+as `Sequence <index>: <sequence>`.
 """
 function print_sequences(jst::JournaledString)
     for i in 1:length(jst.deltaMap)
@@ -159,21 +126,10 @@ end
 
 
 """
-Builds a string with all sequences.
+    build_sequences(journal) -> String
 
-# Args:
-   - `js`: JournaledString structure.
-
-# Returns:
-   - Concatenated sequences.
-
-# Examples:
-```julia-repl
-    julia> build_sequences(js) 
-    "Sequence 1: ACGT...
-    Sequence 2: TGCA...
-    ..."
-```    
+Return the text printed by [`print_sequences`](@ref), without writing
+to `stdout`.
 """
 function build_sequences(js :: JournaledString)
     io = IOBuffer()
@@ -186,20 +142,10 @@ end
 
 
 """
-Prints all deltas in a JournaledString.
+    print_deltas(journal)
 
-# Args:
-   - `js`: JournaledString structure.
-
-# Returns:
-   - None (prints deltas).
-
-# Examples:
-```julia-repl
-    julia> print_deltas(js)
-    " String number 1:
-      [time=1] JournalEntry: ... "
-```
+Print every edit in `journal` to `stdout`, grouped by sequence index.
+Each edit line is `[time = <timestamp>] JournalEntry: <entry>`.
 """
 function print_deltas(js :: JournaledString)
     for j in 1:length(js.deltaMap)
@@ -212,24 +158,6 @@ function print_deltas(js :: JournaledString)
 end
 
 
-"""
-Adds a delta to a JournaledString.
-
-# Args:
-   - `js`: JournaledString structure. 
-   - `indices`: Indices to update. 
-   - `delta_type`: Type of delta. 
-   - `position`: Position for delta. 
-   - `data`: Data for the delta.
-
-# Returns:
-   - None (modifies JournaledString).
-
-# Examples:
-```julia-repl
-    julia> add_delta!(js, [1, 2], DeltaTypeIns, 3, "AC") 
-```    
-"""
 function _check_indices(n :: Integer, indices)
     for idx in indices
         1 <= idx <= n || throw(BoundsError(1:n, idx))
@@ -237,6 +165,41 @@ function _check_indices(n :: Integer, indices)
     return nothing
 end
 
+"""
+    add_delta!(journal, indices, kind, position, data)
+    add_delta!(journal, indices, entry)
+    add_delta!(journal, index, kind, position, data)
+    add_delta!(journal, index, entry)
+
+Record one edit on each listed derived sequence of a [`JournaledString`](@ref)
+or [`JSTree`](@ref).
+
+`indices` is a 1-based vector of sequence indexes. A bare integer records
+the edit on that one sequence. An index outside the journal raises
+`BoundsError`.
+
+`position` is a 1-based reference coordinate. `kind` is a [`DeltaType`](@ref)
+and `data` is the payload accepted by [`JournalEntry`](@ref). Passing an
+`entry` reuses its kind, position, and payload. The timestamp already stored
+on `entry` is ignored.
+
+Each recorded edit is stamped with the journal's current clock, and the
+clock then advances by one. A call that lists several sequences stores the
+same allele at successive times. The allele is checked against the reference
+before it is stored. A deletion past the end of the reference, a symbol
+outside the alphabet, or a structural variant that needs a gap on a 2-bit
+alphabet raises `ArgumentError`.
+
+# Examples
+```jldoctest
+julia> journal = JournaledString(dna"ACGTACGT", 1);
+
+julia> add_delta!(journal, 1, DeltaTypeDel, 3, 2);
+
+julia> String(sequence(journal, 1))
+"ACACGT"
+```
+"""
 function add_delta!(js :: JournaledString{S},
                     indices :: AbstractVector{<:Integer},
                     delta_type :: DeltaType,
@@ -277,10 +240,7 @@ function _matching_bucket!(::Type{S},
 end
 
 """
-Adds a delta to every listed sequence in a JSTree.
-
-Entries that share a position, delta type, and payload share one bucket,
-which `build_tree!` later turns into one branch.
+Place `entry` in the bucket of equal edits at its reference position.
 """
 function _insert_tree_entry!(tree :: JSTree{S}, idx :: Integer, entry :: JournalEntry{S}) where {S <: LongSequence}
     vec = get!(tree.journal, entry.position) do
@@ -307,19 +267,6 @@ function add_delta!(tree :: JSTree{S},
     return nothing
 end
 
-"""
-Insert a JournalEntry template into a JSTree, stamping each insertion
-with the tree's current_time (and then incrementing it).
-
-# Args
-- `tree`     : the JSTree to modify
-- `indices`  : Vector of sequence indices where this entry applies
-- `entry`    : a JournalEntry whose `delta_type`, `position`, and `data`
-               we'll reuse (its `.time` is ignored)
-
-# Returns
-- `nothing`  : mutates `tree.journal` and `tree.current_time`
-"""
 function add_delta!(tree :: JSTree{S}, indices :: AbstractVector{<:Integer}, entry :: JournalEntry) where {S <: LongSequence}
     _check_indices(tree.length, indices)
     for idx in indices
@@ -366,22 +313,6 @@ function build_tree!(tree :: JSTree{S}) where {S <: LongSequence}
     end
 end
 
-"""
-Adds a JournalEntry to indices.
-
-# Args:
-   - `js`: JournaledString structure.
-   - `indices`: Indices to update.
-   - `entry`: JournalEntry object.
-
-# Returns:
-   - None (modifies JournaledString).
-
-# Examples:
-```julia-repl
-    julia> add_delta!(js, [1], entry)
-```
-"""
 function add_delta!(js :: JournaledString{S},
                     indices :: AbstractVector{<:Integer},
                     entry :: JournalEntry) where {S <: LongSequence}
@@ -395,12 +326,6 @@ function add_delta!(js :: JournaledString{S},
     return nothing
 end
 
-"""
-    add_delta!(journal, index, kind, position, data)
-    add_delta!(journal, index, entry)
-
-Record one edit on a single derived sequence. `index` is 1-based.
-"""
 function add_delta!(journal :: Union{JournaledString, JSTree},
                     index :: Integer,
                     delta_type :: DeltaType,
@@ -416,19 +341,15 @@ function add_delta!(journal :: Union{JournaledString, JSTree},
 end
 
 """
-Removes a delta by time key.
+    remove_delta!(journal, index, time)
+    remove_delta!(tree, time)
 
-# Args: 
-   - `js`: JournaledString structure. 
-   - `time`: Time key of the delta.
+Remove one recorded edit.
 
-# Returns: 
-   - None (modifies JournaledString).
-
-# Examples: 
-```julia-repl
-    julia> remove_delta!(js, 5) 
-```
+On a [`JournaledString`](@ref), `index` selects the derived sequence and
+`time` selects the edit. On a [`JSTree`](@ref), `time` selects the edit
+and the derived tree is rebuilt. A missing edit raises `ArgumentError`.
+An index outside the journal raises `BoundsError`.
 """
 function remove_delta!(js :: JournaledString, idx :: Integer, time :: Integer)
     _check_indices(length(js.deltaMap), (idx,))
@@ -441,11 +362,6 @@ function remove_delta!(js :: JournaledString, idx :: Integer, time :: Integer)
     return nothing
 end
 
-"""
-    remove_delta!(tree::JSTree, time)
-
-Remove the journal entry stamped with `time` and rebuild the derived tree.
-"""
 function remove_delta!(tree::JSTree, time::Timestamp)
     found = false
     pos_to_clean = nothing
@@ -494,7 +410,9 @@ end
 remove_delta!(tree :: JSTree, time :: Integer) = remove_delta!(tree, Timestamp(time))
 
 """
-Count total deltas in journal (for testing)
+    delta_count(tree) -> Int
+
+Number of edits stored in `tree`.
 """
 function delta_count(tree::JSTree)
     count = 0

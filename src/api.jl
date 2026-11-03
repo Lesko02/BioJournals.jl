@@ -6,13 +6,26 @@
 """
     sequence(journal, i) -> LongSequence
 
-Materialize derived sequence `i`. This method is part of `FASTX.sequence`,
-so a journal and a FASTA/FASTQ record share one function. The result is an
-ordinary `LongSequence`: BioSequences `findall`, `translate`, and FASTX
-writers accept it directly.
+Materialize derived sequence `i` by replaying its edits on the reference.
 
-`i` is 1-based. For a `JournaledString` it indexes `deltaMap`. For a `JSTree`
-it indexes the sequences tracked by the tree.
+This method belongs to `FASTX.sequence`, so a journal and a FASTA or FASTQ
+record share one name. The result is an ordinary `LongSequence`. BioSequences
+search and translation, and the FASTX writers, accept it directly.
+
+`i` is 1-based. A [`JournaledString`](@ref) indexes `deltaMap`. A
+[`JSTree`](@ref) indexes the sequences tracked by the tree. An index outside
+that range raises `BoundsError`.
+
+# Examples
+```jldoctest
+julia> journal = JournaledString(dna"ACGT", 1);
+
+julia> add_delta!(journal, 1, DeltaTypeIns, 2, "TT");
+
+julia> sequence(journal, 1)
+6nt DNA Sequence:
+ATTCGT
+```
 """
 function sequence(js :: JournaledString, i :: Integer)
     return apply_delta(js.reference, edits_at(js, i))
@@ -25,7 +38,7 @@ end
 """
     sequences(journal) -> Vector{<:LongSequence}
 
-Materialize every derived sequence in `journal`.
+Materialize every derived sequence in `journal`, in index order.
 """
 function sequences(js :: JournaledString)
     return [sequence(js, i) for i in eachindex(js.deltaMap)]
@@ -46,7 +59,8 @@ nsequences(tree :: JSTree) = tree.length
 """
     get_mutation_history(delta_map) -> String
 
-List every edit in `delta_map` with its timestamp.
+List every edit in `delta_map`, oldest first. Each line has the form
+`Time <timestamp>: <entry>`.
 """
 function get_mutation_history(delta_map :: DeltaMap)
     io = IOBuffer()
@@ -58,15 +72,12 @@ end
 
 
 """
-Retrieve mutations within a specific timestamp interval.
+    get_mutation_interval(journal, time1, time2) -> String
 
-# Args: 
-   - `delta_map`: The DeltaMap containing mutations. 
-   - `time1`: Start timestamp of the interval. 
-   - `time2`: End timestamp of the interval.
+List edits whose timestamp lies in the closed interval `time1:time2`.
 
-# Returns: 
-   - A string listing mutations within the given range.
+Each line names the time, the entry, and the 1-based sequence index.
+An empty string means no edit falls in the interval.
 """
 function get_mutation_interval(js :: JournaledString,
                                time1 :: Int,
@@ -85,14 +96,11 @@ end
 
 
 """
-Get sequences at a specific timestamp in a JournaledString.
+    get_sequences_at_time(journal, time) -> Vector{<:LongSequence}
 
-# Args: 
-   - `jst`: The JournaledString to extract sequences from. 
-   - `time`: The timestamp limit for reconstruction.
-
-# Returns:
-   - A vector of sequences at the given time, in the reference alphabet.
+Materialize every derived sequence using only edits whose timestamp is
+less than or equal to `time`. Later edits stay in the journal and are
+omitted from the result. A negative `time` raises `DomainError`.
 """
 function get_sequences_at_time(jst :: JournaledString{S}, time :: Integer) where {S <: LongSequence}
     limit = Timestamp(time)
@@ -110,15 +118,12 @@ end
 
 
 """
-Simulate a mutation in a JournaledString.
+    simulate_mutation!(journal, index, entry)
 
-# Args: 
-   - `jst`: The JournaledString to modify. 
-   - `index`: The index in the delta map. 
-   - `entry`: The JournalEntry mutation to add.
+Record `entry` on derived sequence `index`.
 
-# Modifies: 
-    The JournaledString in place.
+The stored edit receives `journal.current_time`. The timestamp on `entry`
+is ignored. This is [`add_delta!`](@ref) for one sequence.
 """
 function simulate_mutation!(jst :: JournaledString,
                             index :: Integer,
@@ -128,15 +133,12 @@ end
 
 
 """
-Remove a mutation at a specific time.
+    remove_mutation!(journal, index, time)
 
-# Args: 
-   - `jst`: The JournaledString to modify. 
-   - `indices`: vector of indices
-   - `time`: The timestamp of the mutation to remove.
+Remove the edit stored on sequence `index` at `time`.
 
-# Modifies: 
-   - The JournaledString in place.
+Raises `ArgumentError` when that timestamp is absent, and `BoundsError`
+when `index` is outside the journal.
 """
 function remove_mutation!(jst :: JournaledString,
                           index :: Integer,
@@ -146,15 +148,14 @@ end
 
 
 """
-Check if two JournaledStrings are equal.
+    is_equal(a, b) -> Bool
 
-# Args: 
-   - `jst1`: The first JournaledString. 
-   - `jst2`: The second JournaledString.
+Compare the contents of two journals.
 
-# Returns: 
-   - `true` if both have identical reference, time, and deltas.
-   - `false` otherwise
+Two [`JournaledString`](@ref) values are equal when their reference,
+clock, reference identifier, and per-sequence journals match. Two
+[`JSTree`](@ref) values are equal when their reference, clock, number of
+sequences, and journal match. The derived `rootChildren` cache is ignored.
 """
 function is_equal(jst1 :: JournaledString,
                   jst2 :: JournaledString) :: Bool
@@ -165,19 +166,6 @@ function is_equal(jst1 :: JournaledString,
 end
 
 
-"""
-Check if two Journaled String Trees (JSTrees) are equal.
-
-`rootChildren` is a cache built by `build_tree!` and is not compared.
-Two trees are equal when their reference, clock, length, and journal match.
-
-Args: 
-    jst1: The first JSTree. 
-    jst2: The second JSTree.
-
-Returns: 
-    `true` if both trees describe the same sequences.
-"""
 function is_equal(jst1 :: JSTree, jst2 :: JSTree) :: Bool
     return jst1.root == jst2.root &&
            jst1.current_time == jst2.current_time &&
@@ -188,13 +176,14 @@ end
 
 
 """
-Print search results from a JournaledString.
+    print_results(results)
 
-# Args: 
-   - `results`: A dictionary mapping delta map indices to match ranges.
+Print the matches returned by [`exact_search`](@ref) or
+[`approximate_search`](@ref).
 
-# Output: 
-   - Prints matches or indicates no matches.
+Integer keys are sequence indexes. String keys are labels. Keys are printed
+in sorted order. An empty vector is reported as no match. The function
+writes to `stdout` and returns `nothing`.
 """
 function print_results(results :: Dict{Int64, Vector{UnitRange{Int64}}})
     for i in sort!(collect(keys(results)))
@@ -210,15 +199,6 @@ function print_results(results :: Dict{Int64, Vector{UnitRange{Int64}}})
 end
 
 
-"""
-Print search results from a Journaled String Tree (JST).
-
-# Args: 
-   - `results`: A dictionary mapping node names to match ranges.
-
-# Output: 
-   - Prints matches or indicates no matches.
-"""
 function print_results(results :: Dict{String, Vector{UnitRange{Int64}}})
     for name in sort!(collect(keys(results)))
         ranges = results[name]

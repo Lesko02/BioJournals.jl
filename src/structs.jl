@@ -3,9 +3,23 @@
 ### structs.jl
 
 """
-Represents a time stamp tagging a given "change".
+    Timestamp(x::Integer) -> Timestamp
 
-The time stamp is a primitive type, stored as an unsigned 64-bit integer.
+Clock value stored on a [`JournalEntry`](@ref). The value is an unsigned
+64-bit integer.
+
+A negative `x` raises `DomainError`. Timestamps compare with other
+timestamps and with integers, including `BigInt`. Adding an unsigned
+integer advances the clock.
+
+# Examples
+```jldoctest
+julia> Timestamp(3) < Timestamp(4)
+true
+
+julia> Timestamp(3) == 3
+true
+```
 """
 primitive type Timestamp <: Unsigned 64 end
 
@@ -54,41 +68,81 @@ Base.print(io::IO, ts::Timestamp) = print(io, repr(UInt64(ts)))
 
 
 """
-Enumeration of delta types for sequence modifications.
+    DeltaType
 
-# Values: 
-   - `DeltaTypeDel`: Deletion 
-   - `DeltaTypeIns`: Insertion 
-   - `DeltaTypeSnp`: Single nucleotide polymorphism 
-   - `DeltaTypeSV`: Structural variation 
-   - `DeltaTypeCNV`: Copy number variation
+Kind of edit stored in a [`JournalEntry`](@ref).
+
+| Value | Payload | Effect |
+|:--|:--|:--|
+| `DeltaTypeDel` | positive length, or a [`Deletion`](@ref) | remove reference bases |
+| `DeltaTypeIns` | sequence, or an [`Insertion`](@ref) | insert before a reference base |
+| `DeltaTypeSnp` | one symbol, or a [`Substitution`](@ref) | replace one reference base |
+| `DeltaTypeSV` | sequence, or a [`StructuralVariant`](@ref) | insert before a base, or append past the reference end |
+| `DeltaTypeCNV` | `(sequence, copies)`, or a [`CopyNumber`](@ref) | insert tandem copies before a reference base |
 """
 @enum DeltaType DeltaTypeDel DeltaTypeIns DeltaTypeSnp DeltaTypeSV DeltaTypeCNV
 
-"""`DeltaTypeDel`: remove one or more reference bases."""
+"""
+    DeltaTypeDel
+
+Remove one or more reference bases, starting at the entry position.
+"""
 DeltaTypeDel
 
-"""`DeltaTypeIns`: insert a sequence immediately before a reference base."""
+"""
+    DeltaTypeIns
+
+Insert a sequence immediately before a reference base.
+"""
 DeltaTypeIns
 
-"""`DeltaTypeSnp`: replace one reference symbol."""
+"""
+    DeltaTypeSnp
+
+Replace the reference symbol at the entry position.
+"""
 DeltaTypeSnp
 
-"""`DeltaTypeSV`: insert a structural-variant allele, or append it past the reference end."""
+"""
+    DeltaTypeSV
+
+Insert a structural-variant allele before a reference base, or append it
+when the position is at or beyond the last reference base.
+"""
 DeltaTypeSV
 
-"""`DeltaTypeCNV`: insert tandem copies of a sequence before a reference base."""
+"""
+    DeltaTypeCNV
+
+Insert tandem copies of a sequence immediately before a reference base.
+"""
 DeltaTypeCNV
 
 """
     ReferenceInterval(first, last)
 
 1-based closed interval on the reference. Both `first` and `last` are
-included, the same convention as `GenomicFeatures.Interval`.
+included, matching `GenomicFeatures.Interval`.
 
-An empty interval (`last == first - 1`) is an insertion anchor: the new
-bases sit immediately before reference base `first`. In VCF that event is
-written with `POS == first - 1`, because VCF names the base before the allele.
+`length` is `last - first + 1`. A position `p` is `in` the interval when
+`first <= p <= last`.
+
+An empty interval (`last == first - 1`) anchors an insertion immediately
+before reference base `first`. The VCF record for that insertion has
+`POS == first - 1`. `first` must be at least 1, and `last` may be at most
+one base before `first`.
+
+# Examples
+```jldoctest
+julia> length(ReferenceInterval(2, 4))
+3
+
+julia> isempty(ReferenceInterval(2, 1))
+true
+
+julia> 3 in ReferenceInterval(2, 4)
+true
+```
 """
 struct ReferenceInterval
     first :: Int
@@ -120,7 +174,10 @@ end
 """
     Deletion(len)
 
-Remove `len` reference bases starting at the entry's reference position.
+Payload that removes `len` reference bases, starting at the entry position.
+
+`len` is a positive integer. The covered locus is
+`ReferenceInterval(position, position + len - 1)`.
 """
 struct Deletion
     len :: Int
@@ -129,8 +186,9 @@ end
 """
     Insertion(seq)
 
-Insert `seq` immediately before the reference base at the entry's position.
-`seq` uses the same alphabet as the journal reference.
+Payload that inserts `seq` immediately before the reference base named by
+the entry position. `seq` uses the journal alphabet and is copied into the
+journal. An empty sequence is rejected.
 """
 struct Insertion{S <: LongSequence}
     seq :: S
@@ -139,7 +197,8 @@ end
 """
     Substitution(base)
 
-Replace one reference symbol.
+Payload that replaces one reference symbol with `base`. `base` must belong
+to the journal alphabet.
 """
 struct Substitution{T}
     base :: T
@@ -148,13 +207,15 @@ end
 """
     StructuralVariant(seq)
 
-Allele inserted by a structural-variant edit.
+Payload of a structural-variant edit. `seq` is copied into the journal and
+must be non-empty.
 
 When the entry position names an existing reference base, `seq` is inserted
-immediately before that base. A position at or beyond the last reference
-base appends `seq` instead. The number of leading gap symbols is
-`position - length(reference)`. A positive pad requires a 4-bit alphabet
-(`LongDNA{4}` or `LongRNA{4}`). `LongDNA{2}` and `LongRNA{2}` have no gap.
+immediately before that base. A position `p` at or beyond the last reference
+base appends `seq`. The number of leading gap symbols is
+`p - length(reference)`. A positive pad requires `LongDNA{4}` or
+`LongRNA{4}`. `LongDNA{2}` and `LongRNA{2}` have no gap symbol, and
+recording that edit raises `ArgumentError`.
 """
 struct StructuralVariant{S <: LongSequence}
     seq :: S
@@ -163,15 +224,22 @@ end
 """
     CopyNumber(seq, copies)
 
-Insert `copies` tandem copies of `seq` before the reference base at the
-entry's position.
+Payload that inserts `copies` tandem copies of `seq` immediately before
+the reference base named by the entry position. `copies` is a positive
+integer and `seq` must be non-empty. Both are stored by copy.
 """
 struct CopyNumber{S <: LongSequence}
     seq :: S
     copies :: Int
 end
 
-"""Edit stored in a [`JournalEntry`](@ref) whose reference sequence type is `S`."""
+"""
+    DeltaPayload{S}
+
+Edit stored beside a reference of type `S`: a [`Deletion`](@ref),
+[`Insertion`](@ref), [`Substitution`](@ref), [`StructuralVariant`](@ref),
+or [`CopyNumber`](@ref).
+"""
 const DeltaPayload{S <: LongSequence} = Union{
     Deletion,
     Insertion{S},
@@ -274,15 +342,45 @@ end
 
 """
     JournalEntry(kind, position, data, time)
+    JournalEntry(kind, interval::ReferenceInterval, data, time)
+    JournalEntry{S}(kind, position, data, time)
 
-One mutation against the reference sequence.
+One edit against a reference of sequence type `S`.
 
-`position` is a 1-based coordinate on the **reference**, not on an
-already edited copy. Replay maps it through every earlier edit, so
-removing an event leaves the other reference coordinates valid.
+`position` is a 1-based coordinate on the reference. Replay maps it through
+every earlier edit, so removing an event leaves the other coordinates valid.
+`position` must be at least 1.
 
-`data` is normalized into a [`DeltaPayload`](@ref). `time` orders edits
-and is the key used by [`DeltaMap`](@ref).
+`data` is normalized into a [`DeltaPayload`](@ref):
+
+  - `DeltaTypeDel`: a positive length, or a `Deletion`
+  - `DeltaTypeIns`: a sequence, or an `Insertion`
+  - `DeltaTypeSnp`: a symbol, a `Char`, or a `Substitution`
+  - `DeltaTypeSV`: a sequence, or a `StructuralVariant`
+  - `DeltaTypeCNV`: `(sequence, copies)`, or a `CopyNumber`
+
+Allele sequences are copied. A later mutation of the caller's sequence does
+not change the stored edit.
+
+The interval constructor reads the coordinate from a [`ReferenceInterval`](@ref).
+A deletion uses a non-empty interval and ignores `data` as the length. A
+substitution requires an interval of length 1. An insertion, copy-number
+change, or structural variant requires an empty interval anchored before
+`first`.
+
+`time` orders edits and is the key in a [`DeltaMap`](@ref). A negative time
+raises `DomainError`.
+
+# Examples
+```jldoctest
+julia> entry = JournalEntry(DeltaTypeIns, 2, "TT", 0);
+
+julia> String(entry.payload.seq)
+"TT"
+
+julia> isempty(locus(entry))
+true
+```
 """
 struct JournalEntry{S <: LongSequence}
     delta_type :: DeltaType
@@ -335,11 +433,17 @@ end
 """
     locus(entry) -> ReferenceInterval
 
-Reference span affected by `entry`, using a 1-based closed interval.
+Reference span affected by `entry`, as a 1-based closed interval.
 
-Deletions and substitutions cover the bases they change. Insertions, copy-number
-changes, and interior structural variants are empty intervals anchored immediately
-before the reference base named by `entry.position`.
+A deletion covers `position:position+len-1`. A substitution covers the
+single base `position`. An insertion, copy-number change, or structural
+variant is an empty interval anchored immediately before `position`.
+
+# Examples
+```jldoctest
+julia> locus(JournalEntry(DeltaTypeDel, ReferenceInterval(2, 4), nothing, 0))
+ReferenceInterval(2, 4)
+```
 """
 function locus(entry :: JournalEntry)
     position = entry.position
@@ -383,7 +487,15 @@ end
 
 
 """
-Sorted mapping of time keys to journal entries for reference sequences of type `S`.
+    DeltaMap{S}()
+    DeltaMap(n::Integer) -> Vector{DeltaMap}
+    DeltaMap(n::Integer, ::Type{S}) -> Vector{DeltaMap{S}}
+
+Time-ordered map from a [`Timestamp`](@ref) to a [`JournalEntry`](@ref) for
+reference sequences of type `S`.
+
+`DeltaMap(n, S)` builds `n` empty journals. `n` must be at least 1. The
+one-argument form uses `LongDNA{4}`.
 """
 const DeltaMap{S <: LongSequence} = SortedDict{Timestamp, JournalEntry{S}, Base.Order.ForwardOrdering}
 
@@ -391,13 +503,6 @@ function DeltaMap{S}() where {S <: LongSequence}
     return SortedDict{Timestamp, JournalEntry{S}}(Base.Order.ForwardOrdering())
 end
 
-"""
-    DeltaMap(n) -> Vector
-    DeltaMap(n, S) -> Vector
-
-`n` empty journals whose reference sequence type is `S`. `S` defaults to
-`LongDNA{4}`, the IUPAC DNA alphabet used by FASTA.
-"""
 DeltaMap(n :: Integer) = DeltaMap(n, LongDNA{4})
 function DeltaMap(n :: Integer, ::Type{S}) where {S <: LongSequence}
     n >= 1 || throw(ArgumentError("a journal needs at least one sequence, got $n"))
@@ -407,14 +512,35 @@ DeltaMap() = DeltaMap{LongDNA{4}}()
 
 
 """
-A reference sequence plus one journal of edits per derived sequence.
+    JournaledString(reference)
+    JournaledString(reference, n::Integer)
+    JournaledString(reference, maps, time=0, id="")
+
+A reference sequence plus one journal of edits for each derived sequence.
 
 `reference` may be any `LongSequence`, including `LongDNA{2}`, `LongDNA{4}`,
-`LongRNA{2}`, and `LongRNA{4}`. The stored reference is a copy. Edits store
-1-based reference coordinates. The per-sequence maps passed to the
-constructor are kept as-is, so an edit made through the journal is visible
-on that same vector. `reference_id` is the FASTA/FASTQ identifier when the
-reference was loaded from a file, and `""` otherwise.
+`LongRNA{2}`, and `LongRNA{4}`. The stored reference is a copy. Calling
+`JournaledString(reference)` creates 10 derived sequences.
+`JournaledString(reference, n)` creates `n` sequences, with `n >= 1`.
+Passing `maps` keeps those per-sequence journals as they are, so a later
+edit is visible on the vector the caller still holds.
+
+`current_time` is the [`Timestamp`](@ref) assigned to the next edit.
+`reference_id` is the FASTA or FASTQ identifier when the reference was
+loaded from a file, and `""` otherwise.
+
+Positions stored in the journals are 1-based reference coordinates.
+[`sequence`](@ref) materializes a derived sequence.
+
+# Examples
+```jldoctest
+julia> journal = JournaledString(dna"ACGT", 1);
+
+julia> add_delta!(journal, 1, DeltaTypeIns, 2, "TT");
+
+julia> String(sequence(journal, 1))
+"ATTCGT"
+```
 """
 mutable struct JournaledString{S <: LongSequence}
     reference :: S
@@ -445,7 +571,13 @@ JournaledString(reference :: LongSequence) = JournaledString(reference, 10)
 
 
 """
+    JSTNode{S}
+
 One node in the tree derived from a [`JSTree`](@ref) journal.
+
+`parent` is `nothing` at a root. `delta` maps a sequence index to the
+[`JournalEntry`](@ref) shared by that branch. `children` holds the nodes
+that follow this one.
 """
 mutable struct JSTNode{S <: LongSequence}
     parent :: Union{Nothing, JSTNode{S}}
@@ -454,8 +586,24 @@ mutable struct JSTNode{S <: LongSequence}
 end
 
 """
-A journaled string tree. `journal` is the source of truth. `rootChildren`
-is rebuilt from it by [`build_tree!`](@ref) for display.
+    JSTree(reference, n)
+
+Journal of `n` derived sequences, with a tree kept for display.
+
+`journal` is the source of truth: a map from a reference position to the
+edit buckets at that position. `rootChildren` is rebuilt from `journal`
+by `print_tree`. `is_equal` compares `root`, `current_time`, `length`,
+and `journal`. `n` must be at least 1. The stored reference is a copy.
+
+# Examples
+```jldoctest
+julia> tree = JSTree(dna"ACGT", 1);
+
+julia> add_delta!(tree, 1, DeltaTypeSnp, 1, 'T');
+
+julia> String(sequence(tree, 1))
+"TCGT"
+```
 """
 mutable struct JSTree{S <: LongSequence}
     root :: S

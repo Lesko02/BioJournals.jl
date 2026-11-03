@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+### Changed
+
+- Public docstrings follow the Julia manual style, with checked examples.
+- The README documents coordinates, alphabets, search, and file input.
+
 ## 1.0.0 — 2026-11-03
 
 First stable API.

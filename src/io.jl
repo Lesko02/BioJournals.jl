@@ -34,8 +34,12 @@ end
 """
     load_fasta(filename) -> Dict{String, LongSequence}
 
-Load FASTA records. DNA is read as `LongDNA{4}`. A record whose sequence
-contains `U` and no `T` is read as `LongRNA{4}`. `.gz` files are decompressed.
+Read FASTA records from `filename`.
+
+DNA is returned as `LongDNA{4}`. A record whose sequence contains `U` and
+no `T` is returned as `LongRNA{4}`. A name ending in `.gz` is decompressed.
+A missing file raises an error. A repeated record identifier raises
+`ArgumentError`.
 """
 function load_fasta(filename)
     if !isfile(filename)
@@ -60,13 +64,14 @@ end
 
 
 """
-Writes sequences to a FASTA file.
+    write_fasta(sequences, filename)
+    write_fasta(journal, filename)
 
-Creates a new file if `filename` does not exist.
+Write FASTA records to `filename`, wrapping lines at 70 columns.
 
-# Args:
-   - `sequences`: A dictionary mapping sequence IDs to `LongDNA{4}` sequences.
-   - `filename`: Path to the output FASTA file.
+`sequences` maps an identifier to a `LongSequence`. `journal` writes every
+derived sequence in index order. The identifier is `reference_id_<index>`
+when the reference was loaded from a file, and `sequence_<index>` otherwise.
 """
 function write_fasta(sequences :: AbstractDict{<:AbstractString, <:LongSequence}, filename :: AbstractString)
     writer = FASTA.Writer(open(filename, "w"); width = 70)
@@ -82,15 +87,14 @@ end
 
 
 """
-Writes records to a FASTQ file.
+    write_fastq(records, filename)
 
-Creates a new file if `filename` does not exist. A filename ending in `.gz`
-is written through a gzip stream.
+Write FASTQ records to `filename`.
 
-# Args:
-   - `records`: A dictionary mapping sequence IDs to tuples of `LongDNA{4}`
-                sequences and their quality scores.
-   - `filename`: Path to the output FASTQ file.
+`records` maps an identifier to `(sequence, quality)`. The quality string
+must have the same number of code units as the sequence. An identifier
+that contains a newline raises an error. A name ending in `.gz` is
+compressed. The writer stores a quality header.
 """
 function write_fastq(records :: AbstractDict{<:AbstractString, <:Tuple{<:LongSequence, <:AbstractString}},
                      filename :: AbstractString)
@@ -123,19 +127,14 @@ end
 
 
 """
-Loads records from a FASTQ file into a dictionary.
+    load_fastq(filename) -> Dict{String, Tuple{LongSequence, String}}
 
-A filename ending in `.gz` is read through a gzip stream.
+Read FASTQ records from `filename`.
 
-# Args:
-   - `filename`: Path to the FASTQ file.
-
-# Returns:
-   - A dictionary mapping sequence IDs to tuples of `LongDNA{4}` sequences
-     and their quality scores.
-
-# Raises:
-   - An error if the file does not exist.
+Each value is `(sequence, quality)`. DNA is `LongDNA{4}`. A record whose
+sequence contains `U` and no `T` is `LongRNA{4}`. A name ending in `.gz`
+is decompressed. A missing file raises an error. A repeated identifier
+raises `ArgumentError`.
 """
 function load_fastq(filename :: String)
     if !isfile(filename)
@@ -178,12 +177,13 @@ end
     read_journal(filename; index=1, id=nothing, n=1) -> JournaledString
 
 Build a journal whose reference is one record from a FASTA or FASTQ file.
-FASTQ quality is not stored. The format is taken from the file name
-(`.fasta`, `.fa`, `.fastq`, `.fq`, optionally compressed with `.gz`).
 
-`id` selects a record by identifier. Otherwise record `index` is used in
-file order (1-based). `n` is the number of derived sequences, all starting
-unedited.
+FASTQ quality is not kept. The format follows the file name: `.fasta`,
+`.fa`, `.fastq`, or `.fq`, with an optional `.gz` suffix. `id` selects a
+record by identifier. Otherwise record `index` is used, in file order and
+1-based. `n` is the number of derived sequences, all unedited. A missing
+file, an empty file, or an unknown `id` raises an error. `n` must be at
+least 1.
 """
 function read_journal(filename :: AbstractString;
                       index :: Integer = 1,
@@ -204,13 +204,6 @@ function read_journal(filename :: AbstractString;
     return JournaledString(reference, DeltaMap(n, typeof(reference)), 0, chosen_id)
 end
 
-"""
-    write_fasta(journal, filename)
-
-Write every derived sequence of `journal` as a FASTA record.
-Identifiers are `reference_id` plus the sequence index when the reference
-came from a file, and `sequence_<index>` otherwise.
-"""
 function write_fasta(journal :: JournaledString, filename :: AbstractString)
     prefix = isempty(journal.reference_id) ? "sequence" : journal.reference_id
     writer = FASTA.Writer(open(filename, "w"); width = 70)
