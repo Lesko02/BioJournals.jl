@@ -314,5 +314,9 @@ Sequence 10: AGATCGAGCGAGCTAGCGACTCAG"
 
 end
 
+include("timestamps.jl")
+include("sequences.jl")
+include("journal.jl")
+include("search_io.jl")
 
 ### runtests.jl ends here.

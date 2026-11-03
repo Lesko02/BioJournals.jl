@@ -59,17 +59,23 @@ end
 function _occupied_range(entry :: JournalEntry, edits, ref_len :: Int, seq_len :: Int)
     payload = entry.payload
     if payload isa StructuralVariant && entry.position >= ref_len
-        tail = _terminal_tail(edits, ref_len)
-        return max(1, seq_len - tail + 1):seq_len
+        # Include the last reference base so a hit that ends there is
+        # inside the rescan window, not only the appended tail.
+        anchor = max(1, seq_len - _terminal_tail(edits, ref_len))
+        return anchor:seq_len
     end
     if _anchor_deleted(edits, entry.position) && !(payload isa Deletion)
         return 1:0
     end
     if payload isa Deletion
         next_ref = entry.position + payload.len
-        junction = next_ref <= ref_len ?
-                   _ref_base_pos(edits, next_ref, ref_len) :
-                   _ref_base_pos(edits, ref_len, ref_len) + 1
+        junction = if next_ref <= ref_len
+            _ref_base_pos(edits, next_ref, ref_len)
+        elseif entry.position == 1
+            1
+        else
+            _ref_base_pos(edits, entry.position - 1, ref_len) + 1
+        end
         return junction:junction
     elseif payload isa Substitution
         base = _ref_base_pos(edits, entry.position, ref_len)
