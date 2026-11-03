@@ -33,16 +33,20 @@ like a **Julia** implementation to complement our other efforts in the
 
 BioJournals requires Julia 1.12 or newer.
 
+The current release is [v1.0.0](https://github.com/Lesko02/BioJournals.jl/releases/tag/v1.0.0).
+
 ```julia
 using Pkg
-Pkg.add(url="https://github.com/Lesko02/BioJournals.jl")
+Pkg.add(url="https://github.com/Lesko02/BioJournals.jl", rev="v1.0.0")
 ```
 
 From the Pkg REPL (`]`):
 
 ```julia
-add https://github.com/Lesko02/BioJournals.jl
+add https://github.com/Lesko02/BioJournals.jl#v1.0.0
 ```
+
+Omit the revision to follow the default branch.
 
 The package builds on [BioSequences](https://github.com/BioJulia/BioSequences.jl) for alphabets and search, and on [FASTX](https://github.com/BioJulia/FASTX.jl) for FASTA and FASTQ.
 

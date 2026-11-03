@@ -80,8 +80,8 @@ Each line names the time, the entry, and the 1-based sequence index.
 An empty string means no edit falls in the interval.
 """
 function get_mutation_interval(js :: JournaledString,
-                               time1 :: Int,
-                               time2 :: Int)
+                               time1 :: Integer,
+                               time2 :: Integer)
     
     io = IOBuffer()
     for i in 1:length(js.deltaMap)

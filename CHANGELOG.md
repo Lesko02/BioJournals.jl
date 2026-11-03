@@ -1,12 +1,5 @@
 # Changelog
 
-## Unreleased
-
-### Changed
-
-- Public docstrings follow the Julia manual style, with checked examples.
-- The README documents coordinates, alphabets, search, and file input.
-
 ## 1.0.0 — 2026-11-03
 
 First stable API.
@@ -28,6 +21,8 @@ First stable API.
 - Allele sequences stored in a journal are copied. A later change to the caller's sequence does not rewrite history.
 - A structural variant past the end of a 2-bit sequence is rejected when it is recorded. Those alphabets cannot encode a gap.
 - FASTA and FASTQ loaders reject duplicate record identifiers.
+- Public docstrings follow the Julia manual style, with checked examples.
+- The README documents coordinates, alphabets, search, and file input.
 
 ### Removed
 
